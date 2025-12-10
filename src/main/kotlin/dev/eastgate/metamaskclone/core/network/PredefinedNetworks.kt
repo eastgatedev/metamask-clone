@@ -81,12 +81,22 @@ object PredefinedNetworks {
     
     val TESTNET_NETWORKS = ALL_NETWORKS.filter { it.isTestnet }
     val MAINNET_NETWORKS = ALL_NETWORKS.filter { !it.isTestnet }
-    
+
+    val DEFAULT_ENABLED_IDS = listOf("BNB_TESTNET", "ETH_SEPOLIA", "POLYGON_TESTNET")
+
     fun getNetworkById(id: String): Network? {
         return ALL_NETWORKS.find { it.id == id }
     }
-    
+
     fun getNetworkByChainId(chainId: Int): Network? {
         return ALL_NETWORKS.find { it.chainId == chainId }
+    }
+
+    fun getDefaultEnabledNetworks(): List<Network> {
+        return ALL_NETWORKS.filter { it.id in DEFAULT_ENABLED_IDS }
+    }
+
+    fun isNetworkEnabled(id: String, enabledIds: List<String>): Boolean {
+        return id in enabledIds
     }
 }

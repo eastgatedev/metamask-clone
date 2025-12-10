@@ -4,133 +4,377 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.ui.SimpleToolWindowPanel
 import com.intellij.ui.components.JBLabel
+import com.intellij.util.ui.JBUI
+import dev.eastgate.metamaskclone.core.network.NetworkManager
+import dev.eastgate.metamaskclone.core.storage.ProjectStorage
 import dev.eastgate.metamaskclone.core.wallet.WalletManager
+import dev.eastgate.metamaskclone.models.Token
 import dev.eastgate.metamaskclone.models.Wallet
-import dev.eastgate.metamaskclone.ui.panels.SimpleWalletListPanel
-import dev.eastgate.metamaskclone.ui.panels.WalletInfoPanel
-import dev.eastgate.metamaskclone.ui.panels.ActionButtonPanel
-import dev.eastgate.metamaskclone.ui.dialogs.CreateWalletDialog
-import dev.eastgate.metamaskclone.ui.dialogs.ImportWalletDialog
+import dev.eastgate.metamaskclone.ui.dialogs.*
+import dev.eastgate.metamaskclone.ui.panels.*
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.collect
 import java.awt.BorderLayout
 import java.awt.Font
 import javax.swing.*
 
 class MetaMaskToolWindow(private val project: Project) {
-    
+
     private val walletManager = WalletManager.getInstance(project)
+    private val networkManager = NetworkManager.getInstance(project)
+    private val storage = ProjectStorage.getInstance(project)
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
-    
+
     private val mainPanel = SimpleToolWindowPanel(false, true)
-    private val walletListPanel = SimpleWalletListPanel()
-    private val walletInfoPanel = WalletInfoPanel()
-    private val actionButtonPanel = ActionButtonPanel()
-    
+
+    // UI Components
+    private val networkSelectorBar = NetworkSelectorBar()
+    private val walletSelectorBar = WalletSelectorBar()
+    private val balanceDisplayPanel = BalanceDisplayPanel()
+    private val actionButtonsRow = ActionButtonsRow()
+    private val mainTabPanel = MainTabPanel()
+
+    // State
+    private var tokens: MutableList<Token> = mutableListOf()
+
     init {
+        loadTokens()
         setupUI()
-        observeWalletChanges()
+        observeChanges()
         setupEventListeners()
     }
-    
+
+    private fun loadTokens() {
+        tokens = storage.getTokens().toMutableList()
+    }
+
     private fun setupUI() {
         mainPanel.layout = BorderLayout()
-        mainPanel.border = BorderFactory.createEmptyBorder(10, 15, 15, 15)
-        
+        mainPanel.border = BorderFactory.createEmptyBorder(10, 10, 10, 10)
+
+        // Header section (Title + Network + Wallet)
+        val headerPanel = JPanel()
+        headerPanel.layout = BoxLayout(headerPanel, BoxLayout.Y_AXIS)
+
         // Title
         val titleLabel = JBLabel("MetaMask Clone")
         titleLabel.font = titleLabel.font.deriveFont(Font.BOLD, 16f)
+        titleLabel.alignmentX = JPanel.CENTER_ALIGNMENT
+        titleLabel.border = JBUI.Borders.empty(0, 0, 10, 0)
+
         val titlePanel = JPanel(BorderLayout())
-        titlePanel.border = BorderFactory.createEmptyBorder(0, 0, 15, 0)
         titlePanel.add(titleLabel, BorderLayout.CENTER)
-        
-        // Content panel with better layout management
-        val contentPanel = JPanel(BorderLayout())
-        
-        // Top section with wallet list
-        contentPanel.add(walletListPanel, BorderLayout.NORTH)
-        
-        // Middle section with wallet info (limited height)
+
+        headerPanel.add(titlePanel)
+        headerPanel.add(networkSelectorBar)
+        headerPanel.add(walletSelectorBar)
+
+        // Balance and actions section
         val middlePanel = JPanel(BorderLayout())
-        middlePanel.add(walletInfoPanel, BorderLayout.NORTH)
-        contentPanel.add(middlePanel, BorderLayout.CENTER)
-        
-        // Bottom section with action buttons
-        contentPanel.add(actionButtonPanel, BorderLayout.SOUTH)
-        
-        mainPanel.add(titlePanel, BorderLayout.NORTH)
+        middlePanel.add(balanceDisplayPanel, BorderLayout.NORTH)
+        middlePanel.add(actionButtonsRow, BorderLayout.CENTER)
+
+        // Content panel combining middle and tabs
+        val contentPanel = JPanel(BorderLayout())
+        contentPanel.add(middlePanel, BorderLayout.NORTH)
+        contentPanel.add(mainTabPanel, BorderLayout.CENTER)
+
+        // Main layout
+        mainPanel.add(headerPanel, BorderLayout.NORTH)
         mainPanel.add(contentPanel, BorderLayout.CENTER)
+
+        // Initial state
+        updateNetworkUI()
+        updateWalletUI()
+        updateTokensUI()
     }
-    
-    private fun observeWalletChanges() {
+
+    private fun observeChanges() {
+        // Observe network changes
+        scope.launch {
+            networkManager.selectedNetwork.collect { network ->
+                SwingUtilities.invokeLater {
+                    networkSelectorBar.updateNetwork(network)
+                    updateBalanceDisplay()
+                    updateTokensUI()
+                }
+            }
+        }
+
+        // Observe wallet list changes
         scope.launch {
             walletManager.wallets.collect { wallets ->
                 SwingUtilities.invokeLater {
-                    walletListPanel.updateWallets(wallets)
+                    // If no wallet selected, select the first one
+                    if (walletManager.selectedWallet.value == null && wallets.isNotEmpty()) {
+                        walletManager.selectWallet(wallets.first().address)
+                    }
                 }
             }
         }
-        
+
+        // Observe selected wallet changes
         scope.launch {
             walletManager.selectedWallet.collect { wallet ->
                 SwingUtilities.invokeLater {
-                    walletInfoPanel.updateWallet(wallet)
-                    actionButtonPanel.setSelectedWallet(wallet)
+                    walletSelectorBar.updateWallet(wallet)
+                    updateBalanceDisplay()
                 }
             }
         }
     }
-    
+
     private fun setupEventListeners() {
-        // Wallet selection
-        walletListPanel.onWalletSelected = { wallet ->
-            walletManager.selectWallet(wallet.address)
+        // Network selector click
+        networkSelectorBar.onNetworkClick = {
+            showNetworkSelectionDialog()
         }
-        
+
+        // Wallet selector click
+        walletSelectorBar.onWalletClick = {
+            showWalletSelectionPopup()
+        }
+
+        walletSelectorBar.onCopyAddress = { address ->
+            Messages.showInfoMessage(project, "Address copied to clipboard", "Copied")
+        }
+
         // Action buttons
-        actionButtonPanel.onCreateWallet = {
-            showCreateWalletDialog()
+        actionButtonsRow.onSendClick = {
+            showSendDialog()
         }
-        
-        actionButtonPanel.onImportWallet = {
-            showImportWalletDialog()
+
+        actionButtonsRow.onReceiveClick = {
+            showReceiveDialog()
         }
-        
-        actionButtonPanel.onExportPrivateKey = { wallet ->
-            walletInfoPanel.exportPrivateKey(wallet, walletManager)
+
+        // Token list events
+        mainTabPanel.onAddTokenClick = {
+            showAddTokenDialog()
         }
-        
-        actionButtonPanel.onDeleteWallet = { wallet ->
-            deleteWallet(wallet)
+
+        mainTabPanel.onTokenSelected = { token ->
+            showTokenDetails(token)
         }
     }
-    
-    private fun showCreateWalletDialog() {
-        val dialog = CreateWalletDialog(project, walletManager)
+
+    private fun updateNetworkUI() {
+        val network = networkManager.selectedNetwork.value
+        networkSelectorBar.updateNetwork(network)
+    }
+
+    private fun updateWalletUI() {
+        val wallet = walletManager.selectedWallet.value
+        walletSelectorBar.updateWallet(wallet)
+    }
+
+    private fun updateBalanceDisplay() {
+        val network = networkManager.selectedNetwork.value
+        // Placeholder balance - will be fetched from blockchain in Phase 3
+        balanceDisplayPanel.updateBalance("0", network.symbol, "$0.00")
+    }
+
+    private fun updateTokensUI() {
+        val networkId = networkManager.selectedNetwork.value.id
+        val networkTokens = tokens.filter { it.networkId == networkId }
+        mainTabPanel.updateTokens(networkTokens)
+    }
+
+    private fun showNetworkSelectionDialog() {
+        val dialog = NetworkSelectionDialog(project, networkManager)
         dialog.show()
     }
-    
-    private fun showImportWalletDialog() {
-        val dialog = ImportWalletDialog(project, walletManager)
+
+    private fun showWalletSelectionPopup() {
+        val wallets = walletManager.wallets.value
+        if (wallets.isEmpty()) {
+            showCreateOrImportDialog()
+            return
+        }
+
+        val popup = JPopupMenu()
+
+        // Wallet list
+        for (wallet in wallets) {
+            val isSelected = walletManager.selectedWallet.value?.address == wallet.address
+            val menuItem = JMenuItem(if (isSelected) "✓ ${wallet.name}" else "   ${wallet.name}")
+            menuItem.toolTipText = wallet.address
+            menuItem.addActionListener {
+                walletManager.selectWallet(wallet.address)
+            }
+            popup.add(menuItem)
+        }
+
+        popup.addSeparator()
+
+        // Create new wallet
+        val createItem = JMenuItem("+ Create New Wallet")
+        createItem.addActionListener {
+            val dialog = CreateWalletDialog(project, walletManager)
+            dialog.show()
+        }
+        popup.add(createItem)
+
+        // Import wallet
+        val importItem = JMenuItem("+ Import Wallet")
+        importItem.addActionListener {
+            val dialog = ImportWalletDialog(project, walletManager)
+            dialog.show()
+        }
+        popup.add(importItem)
+
+        popup.addSeparator()
+
+        // Wallet management
+        val selectedWallet = walletManager.selectedWallet.value
+        if (selectedWallet != null) {
+            val exportItem = JMenuItem("Export Private Key")
+            exportItem.addActionListener {
+                exportPrivateKey(selectedWallet)
+            }
+            popup.add(exportItem)
+
+            val deleteItem = JMenuItem("Delete Wallet")
+            deleteItem.addActionListener {
+                deleteWallet(selectedWallet)
+            }
+            popup.add(deleteItem)
+        }
+
+        popup.show(walletSelectorBar, 0, walletSelectorBar.height)
+    }
+
+    private fun showCreateOrImportDialog() {
+        val options = arrayOf("Create New", "Import Existing", "Cancel")
+        val result = Messages.showDialog(
+            project,
+            "No wallets found. Would you like to create a new wallet or import an existing one?",
+            "No Wallet",
+            options,
+            0,
+            Messages.getQuestionIcon()
+        )
+
+        when (result) {
+            0 -> {
+                val dialog = CreateWalletDialog(project, walletManager)
+                dialog.show()
+            }
+            1 -> {
+                val dialog = ImportWalletDialog(project, walletManager)
+                dialog.show()
+            }
+        }
+    }
+
+    private fun showSendDialog() {
+        val wallet = walletManager.selectedWallet.value
+        if (wallet == null) {
+            Messages.showWarningDialog(project, "Please select a wallet first", "No Wallet Selected")
+            return
+        }
+
+        val networkId = networkManager.selectedNetwork.value.id
+        val networkTokens = tokens.filter { it.networkId == networkId }
+
+        val dialog = SendTokenDialog(project, wallet, null, networkTokens)
         dialog.show()
     }
-    
+
+    private fun showReceiveDialog() {
+        val wallet = walletManager.selectedWallet.value
+        if (wallet == null) {
+            Messages.showWarningDialog(project, "Please select a wallet first", "No Wallet Selected")
+            return
+        }
+
+        val dialog = ReceiveDialog(project, wallet)
+        dialog.show()
+    }
+
+    private fun showAddTokenDialog() {
+        val networkId = networkManager.selectedNetwork.value.id
+        val dialog = AddTokenDialog(project, networkId)
+
+        if (dialog.showAndGet()) {
+            dialog.resultToken?.let { token ->
+                // Check for duplicates
+                val existingIndex = tokens.indexOfFirst {
+                    it.contractAddress.equals(token.contractAddress, ignoreCase = true) &&
+                    it.networkId == token.networkId
+                }
+
+                if (existingIndex >= 0) {
+                    tokens[existingIndex] = token
+                } else {
+                    tokens.add(token)
+                }
+
+                storage.saveTokens(tokens)
+                updateTokensUI()
+            }
+        }
+    }
+
+    private fun showTokenDetails(token: Token) {
+        // For now, just show a simple info dialog
+        // In Phase 3, this could open a detailed token view
+        Messages.showInfoMessage(
+            project,
+            """
+            Token: ${token.symbol}
+            Name: ${token.name}
+            Contract: ${token.contractAddress}
+            Decimals: ${token.decimals}
+            Balance: ${token.getFormattedBalance()} ${token.symbol}
+
+            (Balance fetching will be implemented in Phase 3)
+            """.trimIndent(),
+            "Token Details"
+        )
+    }
+
+    private fun exportPrivateKey(wallet: Wallet) {
+        val password = Messages.showPasswordDialog(
+            "Enter password to export private key:",
+            "Export Private Key"
+        )
+
+        if (password != null) {
+            try {
+                val privateKey = walletManager.exportPrivateKey(wallet.address, password)
+                val result = Messages.showYesNoDialog(
+                    project,
+                    "Private Key:\n$privateKey\n\nWARNING: Never share your private key!\n\nCopy to clipboard?",
+                    "Private Key",
+                    Messages.getWarningIcon()
+                )
+                if (result == Messages.YES) {
+                    dev.eastgate.metamaskclone.utils.ClipboardUtil.copyToClipboard(privateKey)
+                    Messages.showInfoMessage(project, "Private key copied to clipboard", "Copied")
+                }
+            } catch (e: Exception) {
+                Messages.showErrorDialog(project, "Failed to export: ${e.message}", "Export Failed")
+            }
+        }
+    }
+
     private fun deleteWallet(wallet: Wallet) {
         val result = Messages.showYesNoDialog(
+            project,
             "Are you sure you want to delete wallet '${wallet.name}'?\n\nThis action cannot be undone!",
             "Delete Wallet",
             Messages.getWarningIcon()
         )
-        
+
         if (result == Messages.YES) {
             walletManager.deleteWallet(wallet.address)
         }
     }
-    
+
     fun getContent(): JComponent {
         return mainPanel
     }
-    
+
     fun dispose() {
         scope.cancel()
     }

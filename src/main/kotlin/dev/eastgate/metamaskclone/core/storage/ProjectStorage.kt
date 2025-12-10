@@ -5,6 +5,7 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
 import com.intellij.openapi.project.Project
+import dev.eastgate.metamaskclone.models.Token
 import dev.eastgate.metamaskclone.models.Wallet
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
@@ -26,6 +27,8 @@ class ProjectStorage : PersistentStateComponent<ProjectStorage.State> {
         var wallets: String = "[]",
         var selectedNetwork: String = "BNB_TESTNET",
         var customNetworks: String = "[]",
+        var enabledNetworkIds: String = "[\"BNB_TESTNET\", \"ETH_SEPOLIA\", \"POLYGON_TESTNET\"]",
+        var tokens: String = "[]",
         var encryptedMasterPassword: String? = null,
         var settings: String = "{}"
     )
@@ -70,6 +73,30 @@ class ProjectStorage : PersistentStateComponent<ProjectStorage.State> {
     
     fun saveCustomNetworks(networks: List<Network>) {
         myState.customNetworks = json.encodeToString(networks)
+    }
+
+    fun getEnabledNetworkIds(): List<String> {
+        return try {
+            json.decodeFromString(myState.enabledNetworkIds)
+        } catch (e: Exception) {
+            listOf("BNB_TESTNET", "ETH_SEPOLIA", "POLYGON_TESTNET")
+        }
+    }
+
+    fun setEnabledNetworkIds(ids: List<String>) {
+        myState.enabledNetworkIds = json.encodeToString(ids)
+    }
+
+    fun getTokens(): List<Token> {
+        return try {
+            json.decodeFromString(myState.tokens)
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    fun saveTokens(tokens: List<Token>) {
+        myState.tokens = json.encodeToString(tokens)
     }
     
     fun getMasterPassword(): String? {
