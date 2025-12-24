@@ -60,6 +60,8 @@ dependencies {
     
     // Testing
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
+    testImplementation("junit:junit:4.13.2") // Required for IntelliJ Platform test framework
+    testRuntimeOnly("org.junit.vintage:junit-vintage-engine:5.10.2") // JUnit 4 compatibility
     testImplementation("org.mockito.kotlin:mockito-kotlin:5.2.1")
 }
 
@@ -80,6 +82,11 @@ tasks {
     withType<JavaCompile> {
         sourceCompatibility = "21"
         targetCompatibility = "21"
+    }
+
+    // Configure test task to use JUnit Platform
+    test {
+        useJUnitPlatform()
     }
 }
 

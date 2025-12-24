@@ -5,6 +5,8 @@ import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.ui.SimpleToolWindowPanel
 import com.intellij.ui.components.JBLabel
 import com.intellij.util.ui.JBUI
+import dev.eastgate.metamaskclone.core.blockchain.BalanceResult
+import dev.eastgate.metamaskclone.core.blockchain.BlockchainService
 import dev.eastgate.metamaskclone.core.network.NetworkManager
 import dev.eastgate.metamaskclone.core.storage.ProjectStorage
 import dev.eastgate.metamaskclone.core.wallet.WalletManager
@@ -21,6 +23,7 @@ class MetaMaskToolWindow(private val project: Project) {
 
     private val walletManager = WalletManager.getInstance(project)
     private val networkManager = NetworkManager.getInstance(project)
+    private val blockchainService = BlockchainService.getInstance(project)
     private val storage = ProjectStorage.getInstance(project)
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
@@ -138,6 +141,11 @@ class MetaMaskToolWindow(private val project: Project) {
             Messages.showInfoMessage(project, "Address copied to clipboard", "Copied")
         }
 
+        // Balance refresh
+        balanceDisplayPanel.onRefreshClick = {
+            updateBalanceDisplay()
+        }
+
         // Action buttons
         actionButtonsRow.onSendClick = {
             showSendDialog()
@@ -168,9 +176,35 @@ class MetaMaskToolWindow(private val project: Project) {
     }
 
     private fun updateBalanceDisplay() {
+        val wallet = walletManager.selectedWallet.value
         val network = networkManager.selectedNetwork.value
-        // Placeholder balance - will be fetched from blockchain in Phase 3
-        balanceDisplayPanel.updateBalance("0", network.symbol, "$0.00")
+
+        if (wallet == null) {
+            balanceDisplayPanel.updateBalance("0", network.symbol, null)
+            return
+        }
+
+        // Show loading state
+        balanceDisplayPanel.showLoading()
+
+        // Fetch balance asynchronously
+        scope.launch {
+            val result = blockchainService.getBalance(wallet.address, network)
+            SwingUtilities.invokeLater {
+                when (result) {
+                    is BalanceResult.Success -> {
+                        balanceDisplayPanel.updateBalance(
+                            result.balanceFormatted,
+                            result.symbol,
+                            null // USD value - future enhancement
+                        )
+                    }
+                    is BalanceResult.Error -> {
+                        balanceDisplayPanel.showError(result.message)
+                    }
+                }
+            }
+        }
     }
 
     private fun updateTokensUI() {
@@ -273,11 +307,23 @@ class MetaMaskToolWindow(private val project: Project) {
             return
         }
 
-        val networkId = networkManager.selectedNetwork.value.id
-        val networkTokens = tokens.filter { it.networkId == networkId }
+        val network = networkManager.selectedNetwork.value
+        val networkTokens = tokens.filter { it.networkId == network.id }
 
-        val dialog = SendTokenDialog(project, wallet, null, networkTokens)
-        dialog.show()
+        val dialog = SendTokenDialog(
+            project = project,
+            wallet = wallet,
+            network = network,
+            walletManager = walletManager,
+            blockchainService = blockchainService,
+            token = null,
+            availableTokens = networkTokens
+        )
+
+        if (dialog.showAndGet()) {
+            // Refresh balance after successful send
+            updateBalanceDisplay()
+        }
     }
 
     private fun showReceiveDialog() {
@@ -377,5 +423,6 @@ class MetaMaskToolWindow(private val project: Project) {
 
     fun dispose() {
         scope.cancel()
+        blockchainService.shutdown()
     }
 }

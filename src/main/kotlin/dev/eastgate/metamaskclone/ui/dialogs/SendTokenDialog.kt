@@ -4,16 +4,32 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.ui.Messages
 import com.intellij.ui.components.JBTextField
+import dev.eastgate.metamaskclone.core.blockchain.BalanceResult
+import dev.eastgate.metamaskclone.core.blockchain.BlockchainService
+import dev.eastgate.metamaskclone.core.blockchain.GasPriceResult
+import dev.eastgate.metamaskclone.core.blockchain.TransactionResult
+import dev.eastgate.metamaskclone.core.storage.Network
+import dev.eastgate.metamaskclone.core.wallet.WalletManager
 import dev.eastgate.metamaskclone.models.Token
 import dev.eastgate.metamaskclone.models.Wallet
+import dev.eastgate.metamaskclone.utils.ClipboardUtil
+import kotlinx.coroutines.*
+import org.web3j.utils.Convert
+import java.awt.Cursor
 import java.awt.GridBagConstraints
 import java.awt.GridBagLayout
 import java.awt.Insets
+import java.math.BigDecimal
+import java.math.BigInteger
+import java.math.RoundingMode
 import javax.swing.*
 
 class SendTokenDialog(
     private val project: Project,
     private val wallet: Wallet,
+    private val network: Network,
+    private val walletManager: WalletManager,
+    private val blockchainService: BlockchainService,
     private val token: Token? = null,
     private val availableTokens: List<Token> = emptyList()
 ) : DialogWrapper(project) {
@@ -22,17 +38,33 @@ class SendTokenDialog(
     private val amountField = JBTextField()
     private val tokenSelector = JComboBox<String>()
     private val gasLimitField = JBTextField("21000")
-    private val gasPriceField = JBTextField("5")
+    private val gasPriceField = JBTextField("Loading...")
+    private val balanceLabel = JLabel("Loading...")
+    private val estimatedFeeLabel = JLabel("--")
+    private val totalLabel = JLabel("--")
+
+    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+
+    // Store balance for validation
+    private var currentBalanceWei: BigInteger = BigInteger.ZERO
+
+    // Loading state tracking
+    private val statusLabel = JLabel()
+    private var gasPriceLoaded = false
+    private var balanceLoaded = false
 
     init {
-        title = "Send"
+        title = "Send ${network.symbol}"
+        isOKActionEnabled = false  // Disable until data is loaded
         init()
         setupTokenSelector()
+        fetchGasPrice()
+        fetchBalance()
     }
 
     private fun setupTokenSelector() {
         // Add native token option
-        tokenSelector.addItem("Native Token")
+        tokenSelector.addItem("${network.symbol} (Native Token)")
 
         // Add available tokens
         for (t in availableTokens) {
@@ -48,6 +80,109 @@ class SendTokenDialog(
         }
     }
 
+    private fun fetchGasPrice() {
+        gasPriceField.isEnabled = false
+        gasLimitField.isEnabled = false
+
+        scope.launch {
+            val result = blockchainService.getGasPrice(network)
+            SwingUtilities.invokeLater {
+                when (result) {
+                    is GasPriceResult.Success -> {
+                        val gasPriceGwei = Convert.fromWei(BigDecimal(result.gasPrice), Convert.Unit.GWEI)
+                        gasPriceField.text = gasPriceGwei.setScale(2, RoundingMode.CEILING).toPlainString()
+                        gasPriceField.isEnabled = true
+                        gasLimitField.isEnabled = true
+                        gasPriceLoaded = true
+                        checkLoadingComplete()
+                    }
+                    is GasPriceResult.Error -> {
+                        gasPriceField.text = "5" // Default fallback
+                        gasPriceField.isEnabled = true
+                        gasLimitField.isEnabled = true
+                        gasPriceLoaded = true
+                        checkLoadingComplete()
+                    }
+                }
+            }
+        }
+    }
+
+    private fun fetchBalance() {
+        balanceLabel.text = "Loading..."
+        balanceLabel.foreground = java.awt.Color.GRAY
+
+        scope.launch {
+            val result = blockchainService.getBalance(wallet.address, network)
+            SwingUtilities.invokeLater {
+                when (result) {
+                    is BalanceResult.Success -> {
+                        currentBalanceWei = result.balanceWei
+                        val balanceFormatted = formatBalance(result.balanceFormatted)
+                        balanceLabel.text = "$balanceFormatted ${network.symbol}"
+                        balanceLabel.foreground = java.awt.Color.DARK_GRAY
+                        balanceLoaded = true
+                        checkLoadingComplete()
+                    }
+                    is BalanceResult.Error -> {
+                        balanceLabel.text = "Failed to load"
+                        balanceLabel.foreground = java.awt.Color.RED
+                        statusLabel.text = "Error loading balance"
+                        statusLabel.foreground = java.awt.Color.RED
+                        balanceLoaded = true
+                        isOKActionEnabled = true // Allow retry or cancel
+                    }
+                }
+            }
+        }
+    }
+
+    private fun formatBalance(balance: String): String {
+        return try {
+            val value = balance.toBigDecimalOrNull() ?: return balance
+            if (value.scale() > 6) {
+                value.setScale(6, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString()
+            } else {
+                value.stripTrailingZeros().toPlainString()
+            }
+        } catch (e: Exception) {
+            balance
+        }
+    }
+
+    private fun checkLoadingComplete() {
+        if (gasPriceLoaded && balanceLoaded) {
+            statusLabel.text = "Ready to send"
+            statusLabel.foreground = java.awt.Color(0x059669) // Green
+            isOKActionEnabled = true
+            updateTotalEstimate() // Calculate initial estimate
+        }
+    }
+
+    private fun updateTotalEstimate() {
+        try {
+            val amount = amountField.text.trim().toBigDecimalOrNull() ?: BigDecimal.ZERO
+            val gasLimit = gasLimitField.text.trim().toLongOrNull() ?: 21000L
+            val gasPriceGwei = gasPriceField.text.trim().toBigDecimalOrNull() ?: BigDecimal.ZERO
+
+            // Calculate fee: gasLimit * gasPrice (convert Gwei to Ether)
+            val gasPriceEther = gasPriceGwei.divide(BigDecimal("1000000000"), 18, RoundingMode.HALF_UP)
+            val fee = BigDecimal(gasLimit).multiply(gasPriceEther)
+            val total = amount.add(fee)
+
+            // Format for display (max 8 decimal places)
+            val feeFormatted = fee.setScale(8, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString()
+            val totalFormatted = total.setScale(8, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString()
+
+            estimatedFeeLabel.text = "$feeFormatted ${network.symbol}"
+            totalLabel.text = "$totalFormatted ${network.symbol}"
+            totalLabel.font = totalLabel.font.deriveFont(java.awt.Font.BOLD)
+        } catch (e: Exception) {
+            estimatedFeeLabel.text = "--"
+            totalLabel.text = "--"
+        }
+    }
+
     override fun createCenterPanel(): JComponent {
         val panel = JPanel(GridBagLayout())
         val gbc = GridBagConstraints()
@@ -56,18 +191,50 @@ class SendTokenDialog(
 
         var row = 0
 
-        // From address (read-only)
+        // Status label at top
         gbc.gridx = 0
         gbc.gridy = row
+        gbc.gridwidth = 2
+        statusLabel.text = "Fetching network data..."
+        statusLabel.font = statusLabel.font.deriveFont(java.awt.Font.ITALIC)
+        statusLabel.foreground = java.awt.Color.GRAY
+        panel.add(statusLabel, gbc)
+
+        // Network info
+        row++
+        gbc.gridx = 0
+        gbc.gridy = row
+        gbc.gridwidth = 2
+        val networkLabel = JLabel("Network: ${network.name}")
+        networkLabel.font = networkLabel.font.deriveFont(java.awt.Font.ITALIC)
+        panel.add(networkLabel, gbc)
+
+        // From address (read-only)
+        row++
+        gbc.gridx = 0
+        gbc.gridy = row
+        gbc.gridwidth = 1
         gbc.weightx = 0.0
         panel.add(JLabel("From:"), gbc)
 
         gbc.gridx = 1
         gbc.weightx = 1.0
-        val fromField = JBTextField(wallet.getShortAddress())
+        val fromField = JBTextField("${wallet.name} (${wallet.getShortAddress()})")
         fromField.isEditable = false
         fromField.toolTipText = wallet.address
         panel.add(fromField, gbc)
+
+        // Balance display
+        row++
+        gbc.gridx = 0
+        gbc.gridy = row
+        gbc.weightx = 0.0
+        panel.add(JLabel("Balance:"), gbc)
+
+        gbc.gridx = 1
+        gbc.weightx = 1.0
+        balanceLabel.font = balanceLabel.font.deriveFont(java.awt.Font.BOLD)
+        panel.add(balanceLabel, gbc)
 
         // To address
         row++
@@ -114,8 +281,8 @@ class SendTokenDialog(
 
         row++
         gbc.gridy = row
-        val gasLabel = JLabel("Gas Settings (placeholder - not functional)")
-        gasLabel.font = gasLabel.font.deriveFont(java.awt.Font.ITALIC)
+        val gasLabel = JLabel("Gas Settings")
+        gasLabel.font = gasLabel.font.deriveFont(java.awt.Font.BOLD)
         panel.add(gasLabel, gbc)
 
         // Gas Limit
@@ -128,7 +295,7 @@ class SendTokenDialog(
 
         gbc.gridx = 1
         gbc.weightx = 1.0
-        gasLimitField.isEnabled = false
+        gasLimitField.toolTipText = "Gas limit (21000 for simple transfers)"
         panel.add(gasLimitField, gbc)
 
         // Gas Price
@@ -140,16 +307,43 @@ class SendTokenDialog(
 
         gbc.gridx = 1
         gbc.weightx = 1.0
-        gasPriceField.isEnabled = false
+        gasPriceField.toolTipText = "Gas price in Gwei"
         panel.add(gasPriceField, gbc)
 
-        // Warning note
+        // Estimated fee
         row++
         gbc.gridx = 0
         gbc.gridy = row
-        gbc.gridwidth = 2
-        val noteLabel = JLabel("<html><small>⚠️ This is a UI preview. Actual sending is not implemented yet.</small></html>")
-        panel.add(noteLabel, gbc)
+        gbc.gridwidth = 1
+        gbc.weightx = 0.0
+        panel.add(JLabel("Est. Fee:"), gbc)
+
+        gbc.gridx = 1
+        gbc.weightx = 1.0
+        estimatedFeeLabel.foreground = java.awt.Color.GRAY
+        panel.add(estimatedFeeLabel, gbc)
+
+        // Total
+        row++
+        gbc.gridx = 0
+        gbc.gridy = row
+        gbc.weightx = 0.0
+        panel.add(JLabel("Total:"), gbc)
+
+        gbc.gridx = 1
+        gbc.weightx = 1.0
+        totalLabel.foreground = java.awt.Color(0x059669) // Green
+        panel.add(totalLabel, gbc)
+
+        // Add document listeners to update total when values change
+        val updateListener = object : javax.swing.event.DocumentListener {
+            override fun insertUpdate(e: javax.swing.event.DocumentEvent?) = updateTotalEstimate()
+            override fun removeUpdate(e: javax.swing.event.DocumentEvent?) = updateTotalEstimate()
+            override fun changedUpdate(e: javax.swing.event.DocumentEvent?) = updateTotalEstimate()
+        }
+        amountField.document.addDocumentListener(updateListener)
+        gasLimitField.document.addDocumentListener(updateListener)
+        gasPriceField.document.addDocumentListener(updateListener)
 
         return panel
     }
@@ -175,31 +369,183 @@ class SendTokenDialog(
         }
 
         val amountValue = amount.toBigDecimalOrNull()
-        if (amountValue == null || amountValue <= java.math.BigDecimal.ZERO) {
+        if (amountValue == null || amountValue <= BigDecimal.ZERO) {
             Messages.showErrorDialog("Please enter a valid positive amount", "Validation Error")
             return
         }
 
-        // Show confirmation (UI only - doesn't actually send)
-        val selectedToken = if (tokenSelector.selectedIndex == 0) "Native Token" else availableTokens.getOrNull(tokenSelector.selectedIndex - 1)?.symbol ?: "Token"
-        val result = Messages.showYesNoDialog(
+        // Only support native token for now
+        if (tokenSelector.selectedIndex != 0) {
+            Messages.showWarningDialog(project, "ERC-20 token transfers coming soon. Only native token transfers are supported.", "Not Implemented")
+            return
+        }
+
+        // Validate gas settings
+        val gasLimitValue = gasLimitField.text.toLongOrNull()
+        if (gasLimitValue == null || gasLimitValue <= 0) {
+            Messages.showErrorDialog("Please enter a valid gas limit", "Validation Error")
+            return
+        }
+
+        val gasPriceValue = gasPriceField.text.toBigDecimalOrNull()
+        if (gasPriceValue == null || gasPriceValue <= BigDecimal.ZERO) {
+            Messages.showErrorDialog("Please enter a valid gas price", "Validation Error")
+            return
+        }
+
+        // Calculate total required (amount + gas fees)
+        val gasPriceWei = Convert.toWei(gasPriceValue, Convert.Unit.GWEI).toBigInteger()
+        val gasLimit = BigInteger.valueOf(gasLimitValue)
+        val gasFeeWei = gasPriceWei.multiply(gasLimit)
+        val amountWei = Convert.toWei(amountValue, Convert.Unit.ETHER).toBigInteger()
+        val totalRequiredWei = amountWei.add(gasFeeWei)
+
+        // Disable dialog while checking balance
+        isOKActionEnabled = false
+        rootPane?.cursor = Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR)
+
+        // Check balance before prompting for password
+        scope.launch {
+            val balanceResult = blockchainService.getBalance(wallet.address, network)
+
+            SwingUtilities.invokeLater {
+                rootPane?.cursor = Cursor.getDefaultCursor()
+                isOKActionEnabled = true
+
+                when (balanceResult) {
+                    is BalanceResult.Success -> {
+                        if (balanceResult.balanceWei < totalRequiredWei) {
+                            val balanceFormatted = Convert.fromWei(BigDecimal(balanceResult.balanceWei), Convert.Unit.ETHER)
+                            val totalRequired = Convert.fromWei(BigDecimal(totalRequiredWei), Convert.Unit.ETHER)
+                            val gasFee = Convert.fromWei(BigDecimal(gasFeeWei), Convert.Unit.ETHER)
+
+                            Messages.showErrorDialog(
+                                project,
+                                """
+                                Insufficient balance for this transaction.
+
+                                Your balance: $balanceFormatted ${network.symbol}
+                                Amount to send: $amountValue ${network.symbol}
+                                Estimated gas fee: $gasFee ${network.symbol}
+                                Total required: $totalRequired ${network.symbol}
+                                """.trimIndent(),
+                                "Insufficient Balance"
+                            )
+                            return@invokeLater
+                        }
+
+                        // Balance is sufficient, proceed with password prompt
+                        proceedWithTransaction(toAddress, amountValue, gasLimit, gasPriceWei)
+                    }
+                    is BalanceResult.Error -> {
+                        Messages.showErrorDialog(
+                            project,
+                            "Failed to check balance: ${balanceResult.message}",
+                            "Error"
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private fun proceedWithTransaction(
+        toAddress: String,
+        amountValue: BigDecimal,
+        gasLimit: BigInteger,
+        gasPrice: BigInteger
+    ) {
+        // Request password for private key
+        val password = Messages.showPasswordDialog(
+            "Enter wallet password to sign transaction:",
+            "Sign Transaction"
+        )
+
+        if (password.isNullOrEmpty()) {
+            return
+        }
+
+        // Get private key
+        val privateKey: String
+        try {
+            privateKey = walletManager.exportPrivateKey(wallet.address, password)
+        } catch (e: Exception) {
+            Messages.showErrorDialog(project, "Invalid password or wallet error: ${e.message}", "Error")
+            return
+        }
+
+        // Confirm transaction
+        val gasPriceGwei = Convert.fromWei(BigDecimal(gasPrice), Convert.Unit.GWEI)
+        val confirmMessage = """
+            Send $amountValue ${network.symbol} to:
+            $toAddress
+
+            Gas Limit: $gasLimit
+            Gas Price: $gasPriceGwei Gwei
+
+            Continue?
+        """.trimIndent()
+
+        val confirmed = Messages.showYesNoDialog(
             project,
-            "Send $amount $selectedToken to $toAddress?\n\n(This is a UI preview - no actual transaction will be sent)",
-            "Confirm Send",
+            confirmMessage,
+            "Confirm Transaction",
             Messages.getQuestionIcon()
         )
 
-        if (result == Messages.YES) {
-            Messages.showInfoMessage(
-                project,
-                "Transaction preview completed.\nActual blockchain integration coming in Phase 3.",
-                "Send Preview"
+        if (confirmed != Messages.YES) {
+            return
+        }
+
+        // Disable dialog while sending
+        isOKActionEnabled = false
+        rootPane?.cursor = Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR)
+
+        scope.launch {
+            val result = blockchainService.sendNativeCoin(
+                fromAddress = wallet.address,
+                toAddress = toAddress,
+                amount = amountValue,
+                privateKey = privateKey,
+                network = network,
+                gasLimit = gasLimit,
+                gasPrice = gasPrice
             )
-            super.doOKAction()
+
+            SwingUtilities.invokeLater {
+                rootPane?.cursor = Cursor.getDefaultCursor()
+                isOKActionEnabled = true
+
+                when (result) {
+                    is TransactionResult.Success -> {
+                        val message = buildString {
+                            append("Transaction sent successfully!\n\n")
+                            append("Transaction Hash:\n${result.transactionHash}\n\n")
+                            result.explorerUrl?.let {
+                                append("View on Explorer:\n$it")
+                            }
+                        }
+                        Messages.showInfoMessage(project, message, "Transaction Sent")
+
+                        // Copy tx hash to clipboard
+                        ClipboardUtil.copyToClipboard(result.transactionHash)
+
+                        super.doOKAction()
+                    }
+                    is TransactionResult.Error -> {
+                        Messages.showErrorDialog(project, "Transaction failed: ${result.message}", "Error")
+                    }
+                }
+            }
         }
     }
 
     override fun createActions(): Array<Action> {
         return arrayOf(okAction, cancelAction)
+    }
+
+    override fun dispose() {
+        scope.cancel()
+        super.dispose()
     }
 }

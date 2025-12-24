@@ -283,7 +283,7 @@ Phase 4: Advanced Features                 📋 PLANNED
 
 ---
 
-**🎥 YouTube Series:** [AI + IntelliJ Plugin + Web3 (MetaMask Clone)](https://github.com/eastgatedev/metamask-clone)  
+**🎥 YouTube Series:** [AI + IntelliJ Plugin + Web3 (MetaMask Clone)](https://youtube.com/playlist?list=PLbqZIOzRvr8mrKmli_WOVogsUTawr9dML&si=6c4ZE7E6WmiuzqaR)
 **👨‍💻 Author:** 东门Eastgate  
-**📅 Last Updated:** 2025-09-06  
+**📅 Last Updated:** 2025-12-15  
 **⭐ Star the Repo:** [eastgatedev/metamask-clone](https://github.com/eastgatedev/metamask-clone)
