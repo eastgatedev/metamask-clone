@@ -31,7 +31,8 @@ dependencies {
     implementation("org.web3j:crypto:4.10.3")
     implementation("org.web3j:utils:4.10.3")
     implementation("org.web3j:abi:4.10.3")
-    
+    implementation("org.web3j:contracts:4.10.3")
+
     // Mnemonic & HD Wallet - using bitcoinj for BIP39/BIP32/BIP44 support
     implementation("org.bitcoinj:bitcoinj-core:0.16.2") {
         exclude(group = "org.bouncycastle")

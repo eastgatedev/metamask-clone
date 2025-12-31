@@ -7,6 +7,7 @@ import com.intellij.ui.components.JBLabel
 import com.intellij.util.ui.JBUI
 import dev.eastgate.metamaskclone.core.blockchain.BalanceResult
 import dev.eastgate.metamaskclone.core.blockchain.BlockchainService
+import dev.eastgate.metamaskclone.core.blockchain.TokenBalanceResult
 import dev.eastgate.metamaskclone.core.network.NetworkManager
 import dev.eastgate.metamaskclone.core.storage.ProjectStorage
 import dev.eastgate.metamaskclone.core.wallet.WalletManager
@@ -44,6 +45,8 @@ class MetaMaskToolWindow(private val project: Project) {
         setupUI()
         observeChanges()
         setupEventListeners()
+        // Refresh token balances on startup
+        refreshTokenBalances()
     }
 
     private fun loadTokens() {
@@ -100,6 +103,8 @@ class MetaMaskToolWindow(private val project: Project) {
                     updateBalanceDisplay()
                     updateTokensUI()
                 }
+                // Refresh token balances when network changes
+                refreshTokenBalances()
             }
         }
 
@@ -121,6 +126,10 @@ class MetaMaskToolWindow(private val project: Project) {
                 SwingUtilities.invokeLater {
                     walletSelectorBar.updateWallet(wallet)
                     updateBalanceDisplay()
+                }
+                // Refresh token balances when wallet changes
+                if (wallet != null) {
+                    refreshTokenBalances()
                 }
             }
         }
@@ -162,6 +171,10 @@ class MetaMaskToolWindow(private val project: Project) {
 
         mainTabPanel.onTokenSelected = { token ->
             showTokenDetails(token)
+        }
+
+        mainTabPanel.onDeleteToken = { token ->
+            handleDeleteToken(token)
         }
     }
 
@@ -211,6 +224,51 @@ class MetaMaskToolWindow(private val project: Project) {
         val networkId = networkManager.selectedNetwork.value.id
         val networkTokens = tokens.filter { it.networkId == networkId }
         mainTabPanel.updateTokens(networkTokens)
+    }
+
+    /**
+     * Refresh token balances from blockchain.
+     * Called on startup, network/wallet changes, and after transactions.
+     */
+    private fun refreshTokenBalances() {
+        val wallet = walletManager.selectedWallet.value ?: return
+        val network = networkManager.selectedNetwork.value
+        val networkTokens = tokens.filter { it.networkId == network.id }
+
+        if (networkTokens.isEmpty()) return
+
+        scope.launch {
+            var hasUpdates = false
+            for (token in networkTokens) {
+                val result = blockchainService.getTokenBalance(
+                    contractAddress = token.contractAddress,
+                    walletAddress = wallet.address,
+                    decimals = token.decimals,
+                    network = network
+                )
+
+                when (result) {
+                    is TokenBalanceResult.Success -> {
+                        val index = tokens.indexOfFirst { it.id == token.id }
+                        if (index >= 0 && tokens[index].balance != result.balanceFormatted) {
+                            tokens[index] = tokens[index].copy(balance = result.balanceFormatted)
+                            hasUpdates = true
+                        }
+                    }
+                    is TokenBalanceResult.Error -> {
+                        // Log error but continue with other tokens
+                        println("Failed to fetch balance for ${token.symbol}: ${result.message}")
+                    }
+                }
+            }
+
+            if (hasUpdates) {
+                SwingUtilities.invokeLater {
+                    storage.saveTokens(tokens)
+                    updateTokensUI()
+                }
+            }
+        }
     }
 
     private fun showNetworkSelectionDialog() {
@@ -323,6 +381,7 @@ class MetaMaskToolWindow(private val project: Project) {
         if (dialog.showAndGet()) {
             // Refresh balance after successful send
             updateBalanceDisplay()
+            refreshTokenBalances()
         }
     }
 
@@ -338,8 +397,13 @@ class MetaMaskToolWindow(private val project: Project) {
     }
 
     private fun showAddTokenDialog() {
-        val networkId = networkManager.selectedNetwork.value.id
-        val dialog = AddTokenDialog(project, networkId)
+        val network = networkManager.selectedNetwork.value
+        val dialog = AddTokenDialog(
+            project = project,
+            networkId = network.id,
+            network = network,
+            blockchainService = blockchainService
+        )
 
         if (dialog.showAndGet()) {
             dialog.resultToken?.let { token ->
@@ -357,14 +421,15 @@ class MetaMaskToolWindow(private val project: Project) {
 
                 storage.saveTokens(tokens)
                 updateTokensUI()
+                // Refresh balance for the newly added token
+                refreshTokenBalances()
             }
         }
     }
 
     private fun showTokenDetails(token: Token) {
-        // For now, just show a simple info dialog
-        // In Phase 3, this could open a detailed token view
-        Messages.showInfoMessage(
+        val options = arrayOf("OK", "Delete Token")
+        val result = Messages.showDialog(
             project,
             """
             Token: ${token.symbol}
@@ -372,11 +437,33 @@ class MetaMaskToolWindow(private val project: Project) {
             Contract: ${token.contractAddress}
             Decimals: ${token.decimals}
             Balance: ${token.getFormattedBalance()} ${token.symbol}
-
-            (Balance fetching will be implemented in Phase 3)
             """.trimIndent(),
-            "Token Details"
+            "Token Details",
+            options,
+            0,
+            Messages.getInformationIcon()
         )
+
+        if (result == 1) { // Delete Token clicked
+            handleDeleteToken(token)
+        }
+    }
+
+    private fun handleDeleteToken(token: Token) {
+        val result = Messages.showYesNoDialog(
+            project,
+            "Are you sure you want to delete ${token.symbol}?\n\nThis will remove the token from your list. This action cannot be undone.",
+            "Delete Token",
+            "Delete",
+            "Cancel",
+            Messages.getWarningIcon()
+        )
+
+        if (result == Messages.YES) {
+            tokens.removeIf { it.id == token.id }
+            storage.saveTokens(tokens)
+            updateTokensUI()
+        }
     }
 
     private fun exportPrivateKey(wallet: Wallet) {

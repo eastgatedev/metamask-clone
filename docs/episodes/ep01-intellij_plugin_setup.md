@@ -65,11 +65,11 @@ A fully functional blockchain wallet, like MetaMask, but running inside IntelliJ
 
 | 组件 / Component | 选择 / Choice | 🇨🇳 原因 | 🇺🇸 Reason |
 |------------------|---------------|---------|-----------|
-| **语言** | Kotlin | JVM生态，类型安全 | JVM ecosystem, type safety |
-| **平台** | IntelliJ Plugin | 开发者熟悉环境 | Familiar developer environment |
+| **语言 / Language** | Kotlin | JVM生态，类型安全 | JVM ecosystem, type safety |
+| **平台 / Platform** | IntelliJ Plugin | 开发者熟悉环境 | Familiar developer environment |
 | **UI** | Swing | 原生IntelliJ集成 | Native IntelliJ integration |
-| **区块链** | Web3j | 成熟的Java EVM库 | Mature Java EVM library |
-| **加密** | BouncyCastle | 企业级加密标准 | Enterprise encryption standard |
+| **区块链 / Blockchain** | Web3j | 成熟的Java EVM库 | Mature Java EVM library |
+| **加密 / Encryption** | BouncyCastle | 企业级加密标准 | Enterprise encryption standard |
 
 ---
 
@@ -83,9 +83,9 @@ Core philosophy of this series: **AI-assisted, human-optimized**
 
 | 阶段 / Phase | 🇨🇳 人的职责 | 🇺🇸 Human Role | 🇨🇳 AI的作用 | 🇺🇸 AI's Role |
 |--------------|-------------|----------------|-------------|---------------|
-| **需求分析** | 明确功能和约束 | Define requirements | 提供技术建议 | Technical suggestions |
-| **代码实现** | 架构设计和审查 | Architecture & review | 快速生成代码 | Rapid code generation |
-| **调试优化** | 问题定位和优化 | Debug & optimize | 错误分析 | Error analysis |
+| **需求分析 / Requirements** | 明确功能和约束 | Define requirements | 提供技术建议 | Technical suggestions |
+| **代码实现 / Implementation** | 架构设计和审查 | Architecture & review | 快速生成代码 | Rapid code generation |
+| **调试优化 / Debug & Optimize** | 问题定位和优化 | Debug & optimize | 错误分析 | Error analysis |
 
 ### 有效Prompt示例 / Effective Prompt Examples
 

@@ -79,10 +79,10 @@ To support complete wallet functionality, we need to redesign the UI:
 
 | 功能 / Feature | 🇨🇳 描述 | 🇺🇸 Description | 状态 / Status |
 |----------------|---------|-----------------|---------------|
-| **多链支持** | 切换不同区块链网络 | Switch between blockchain networks | 🚧 |
-| **余额显示** | 显示原生币余额 | Display native coin balance | 🚧 |
-| **发送功能** | 发送加密货币 | Send cryptocurrency | 🚧 |
-| **交易历史** | 查看历史交易记录 | View transaction history | 🚧 |
+| **多链支持 / Multi-Chain** | 切换不同区块链网络 | Switch between blockchain networks | 🚧 |
+| **余额显示 / Balance Display** | 显示原生币余额 | Display native coin balance | 🚧 |
+| **发送功能 / Send Function** | 发送加密货币 | Send cryptocurrency | 🚧 |
+| **交易历史 / Transaction History** | 查看历史交易记录 | View transaction history | 🚧 |
 
 ### UI架构规划 / UI Architecture Plan
 

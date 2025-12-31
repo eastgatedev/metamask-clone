@@ -5,12 +5,15 @@ import dev.eastgate.metamaskclone.core.storage.Network
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import org.web3j.contracts.eip20.generated.ERC20
 import org.web3j.crypto.Credentials
 import org.web3j.crypto.RawTransaction
 import org.web3j.crypto.TransactionEncoder
 import org.web3j.protocol.Web3j
 import org.web3j.protocol.core.DefaultBlockParameterName
 import org.web3j.protocol.http.HttpService
+import org.web3j.tx.gas.DefaultGasProvider
+import org.web3j.tx.gas.StaticGasProvider
 import org.web3j.utils.Convert
 import org.web3j.utils.Numeric
 import java.math.BigDecimal
@@ -33,6 +36,7 @@ class BlockchainService private constructor(private val project: Project) {
         }
 
         const val DEFAULT_GAS_LIMIT = 21000L
+        const val ERC20_GAS_LIMIT = 100000L
         const val DEFAULT_TIMEOUT_SECONDS = 60
         const val DEFAULT_POLL_INTERVAL_MS = 2000L
     }
@@ -251,6 +255,156 @@ class BlockchainService private constructor(private val project: Project) {
         }
     }
 
+    // ==================== ERC20 Token Methods ====================
+
+    /**
+     * Fetch ERC20 token metadata (symbol, name, decimals) from contract.
+     *
+     * @param contractAddress The token contract address
+     * @param network The network where the token is deployed
+     */
+    suspend fun getTokenMetadata(
+        contractAddress: String,
+        network: Network
+    ): TokenMetadataResult = withContext(Dispatchers.IO) {
+        try {
+            if (!isValidAddress(contractAddress)) {
+                return@withContext TokenMetadataResult.Error("Invalid contract address: $contractAddress")
+            }
+
+            val web3j = getWeb3j(network)
+            // Use a dummy credentials for read-only operations
+            val dummyCredentials = Credentials.create("0x0000000000000000000000000000000000000000000000000000000000000001")
+            val erc20 = ERC20.load(contractAddress, web3j, dummyCredentials, DefaultGasProvider())
+
+            val symbol = erc20.symbol().send()
+            val name = erc20.name().send()
+            val decimals = erc20.decimals().send().toInt()
+
+            TokenMetadataResult.Success(
+                symbol = symbol,
+                name = name,
+                decimals = decimals
+            )
+        } catch (e: Exception) {
+            TokenMetadataResult.Error(e.message ?: "Failed to fetch token metadata")
+        }
+    }
+
+    /**
+     * Fetch ERC20 token balance for an address.
+     *
+     * @param contractAddress The token contract address
+     * @param walletAddress The wallet address to check balance for
+     * @param decimals Token decimals for formatting
+     * @param network The network where the token is deployed
+     */
+    suspend fun getTokenBalance(
+        contractAddress: String,
+        walletAddress: String,
+        decimals: Int,
+        network: Network
+    ): TokenBalanceResult = withContext(Dispatchers.IO) {
+        try {
+            if (!isValidAddress(contractAddress)) {
+                return@withContext TokenBalanceResult.Error("Invalid contract address: $contractAddress")
+            }
+            if (!isValidAddress(walletAddress)) {
+                return@withContext TokenBalanceResult.Error("Invalid wallet address: $walletAddress")
+            }
+
+            val web3j = getWeb3j(network)
+            // Use a dummy credentials for read-only operations
+            val dummyCredentials = Credentials.create("0x0000000000000000000000000000000000000000000000000000000000000001")
+            val erc20 = ERC20.load(contractAddress, web3j, dummyCredentials, DefaultGasProvider())
+
+            val balanceRaw = erc20.balanceOf(walletAddress).send()
+
+            // Format balance with decimals
+            val divisor = BigInteger.TEN.pow(decimals)
+            val balanceFormatted = BigDecimal(balanceRaw)
+                .divide(BigDecimal(divisor))
+                .stripTrailingZeros()
+                .toPlainString()
+
+            TokenBalanceResult.Success(
+                balanceRaw = balanceRaw,
+                balanceFormatted = balanceFormatted
+            )
+        } catch (e: Exception) {
+            TokenBalanceResult.Error(e.message ?: "Failed to fetch token balance")
+        }
+    }
+
+    /**
+     * Send ERC20 tokens to an address.
+     *
+     * @param contractAddress The token contract address
+     * @param toAddress The recipient's address
+     * @param amount Amount to send in token units (e.g., 10.5 for 10.5 tokens)
+     * @param decimals Token decimals for conversion
+     * @param privateKey The sender's private key for signing
+     * @param network The network to send on
+     * @param gasLimit Gas limit (default: 100000 for ERC20 transfers)
+     * @param gasPrice Gas price in Wei (if null, fetched from network)
+     */
+    suspend fun sendToken(
+        contractAddress: String,
+        toAddress: String,
+        amount: BigDecimal,
+        decimals: Int,
+        privateKey: String,
+        network: Network,
+        gasLimit: BigInteger = BigInteger.valueOf(ERC20_GAS_LIMIT),
+        gasPrice: BigInteger? = null
+    ): TokenTransferResult = withContext(Dispatchers.IO) {
+        try {
+            if (!isValidAddress(contractAddress)) {
+                return@withContext TokenTransferResult.Error("Invalid contract address: $contractAddress")
+            }
+            if (!isValidAddress(toAddress)) {
+                return@withContext TokenTransferResult.Error("Invalid recipient address: $toAddress")
+            }
+
+            val web3j = getWeb3j(network)
+            val credentials = Credentials.create(privateKey)
+
+            // Get gas price if not provided
+            val actualGasPrice = gasPrice ?: run {
+                val gasPriceResponse = web3j.ethGasPrice().send()
+                if (gasPriceResponse.hasError()) {
+                    return@withContext TokenTransferResult.Error("Failed to get gas price: ${gasPriceResponse.error.message}")
+                }
+                gasPriceResponse.gasPrice
+            }
+
+            // Create gas provider with specified gas price and limit
+            val gasProvider = StaticGasProvider(actualGasPrice, gasLimit)
+            val erc20 = ERC20.load(contractAddress, web3j, credentials, gasProvider)
+
+            // Convert amount to smallest unit (multiply by 10^decimals)
+            val multiplier = BigInteger.TEN.pow(decimals)
+            val amountInSmallestUnit = amount.multiply(BigDecimal(multiplier)).toBigInteger()
+
+            // Execute the transfer
+            val receipt = erc20.transfer(toAddress, amountInSmallestUnit).send()
+
+            if (receipt.status != "0x1") {
+                return@withContext TokenTransferResult.Error("Transaction failed on chain")
+            }
+
+            val txHash = receipt.transactionHash
+            val explorerUrl = network.blockExplorerUrl?.let { "$it/tx/$txHash" }
+
+            TokenTransferResult.Success(
+                transactionHash = txHash,
+                explorerUrl = explorerUrl
+            )
+        } catch (e: Exception) {
+            TokenTransferResult.Error(e.message ?: "Token transfer failed")
+        }
+    }
+
     /**
      * Invalidate cached Web3j instance for a network.
      * Useful when network RPC URL changes.
@@ -308,4 +462,34 @@ sealed class ConfirmationResult {
 
     object Timeout : ConfirmationResult()
     data class Error(val message: String) : ConfirmationResult()
+}
+
+// ERC20 Token Result Classes
+
+sealed class TokenMetadataResult {
+    data class Success(
+        val symbol: String,
+        val name: String,
+        val decimals: Int
+    ) : TokenMetadataResult()
+
+    data class Error(val message: String) : TokenMetadataResult()
+}
+
+sealed class TokenBalanceResult {
+    data class Success(
+        val balanceRaw: BigInteger,
+        val balanceFormatted: String
+    ) : TokenBalanceResult()
+
+    data class Error(val message: String) : TokenBalanceResult()
+}
+
+sealed class TokenTransferResult {
+    data class Success(
+        val transactionHash: String,
+        val explorerUrl: String?
+    ) : TokenTransferResult()
+
+    data class Error(val message: String) : TokenTransferResult()
 }

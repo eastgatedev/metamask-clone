@@ -7,6 +7,8 @@ import com.intellij.ui.components.JBTextField
 import dev.eastgate.metamaskclone.core.blockchain.BalanceResult
 import dev.eastgate.metamaskclone.core.blockchain.BlockchainService
 import dev.eastgate.metamaskclone.core.blockchain.GasPriceResult
+import dev.eastgate.metamaskclone.core.blockchain.TokenBalanceResult
+import dev.eastgate.metamaskclone.core.blockchain.TokenTransferResult
 import dev.eastgate.metamaskclone.core.blockchain.TransactionResult
 import dev.eastgate.metamaskclone.core.storage.Network
 import dev.eastgate.metamaskclone.core.wallet.WalletManager
@@ -76,6 +78,59 @@ class SendTokenDialog(
             val index = availableTokens.indexOfFirst { it.id == token.id }
             if (index >= 0) {
                 tokenSelector.selectedIndex = index + 1 // +1 because of native token
+            }
+        }
+
+        // Add listener to update gas limit and balance when token changes
+        tokenSelector.addItemListener { event ->
+            if (event.stateChange == java.awt.event.ItemEvent.SELECTED) {
+                onTokenSelectionChanged()
+            }
+        }
+    }
+
+    private fun onTokenSelectionChanged() {
+        if (tokenSelector.selectedIndex == 0) {
+            // Native token selected
+            gasLimitField.text = "21000"
+            fetchBalance()
+        } else {
+            // ERC20 token selected
+            gasLimitField.text = "100000"
+            fetchTokenBalance()
+        }
+        updateTotalEstimate()
+    }
+
+    private fun fetchTokenBalance() {
+        val tokenIndex = tokenSelector.selectedIndex - 1
+        if (tokenIndex < 0 || tokenIndex >= availableTokens.size) return
+
+        val selectedToken = availableTokens[tokenIndex]
+        balanceLabel.text = "Loading..."
+        balanceLabel.foreground = java.awt.Color.GRAY
+
+        scope.launch {
+            val result = blockchainService.getTokenBalance(
+                contractAddress = selectedToken.contractAddress,
+                walletAddress = wallet.address,
+                decimals = selectedToken.decimals,
+                network = network
+            )
+
+            SwingUtilities.invokeLater {
+                when (result) {
+                    is TokenBalanceResult.Success -> {
+                        currentBalanceWei = result.balanceRaw
+                        val balanceFormatted = formatBalance(result.balanceFormatted)
+                        balanceLabel.text = "$balanceFormatted ${selectedToken.symbol}"
+                        balanceLabel.foreground = java.awt.Color.DARK_GRAY
+                    }
+                    is TokenBalanceResult.Error -> {
+                        balanceLabel.text = "Failed to load"
+                        balanceLabel.foreground = java.awt.Color.RED
+                    }
+                }
             }
         }
     }
@@ -374,12 +429,6 @@ class SendTokenDialog(
             return
         }
 
-        // Only support native token for now
-        if (tokenSelector.selectedIndex != 0) {
-            Messages.showWarningDialog(project, "ERC-20 token transfers coming soon. Only native token transfers are supported.", "Not Implemented")
-            return
-        }
-
         // Validate gas settings
         val gasLimitValue = gasLimitField.text.toLongOrNull()
         if (gasLimitValue == null || gasLimitValue <= 0) {
@@ -393,54 +442,101 @@ class SendTokenDialog(
             return
         }
 
-        // Calculate total required (amount + gas fees)
+        // Calculate gas fees
         val gasPriceWei = Convert.toWei(gasPriceValue, Convert.Unit.GWEI).toBigInteger()
         val gasLimit = BigInteger.valueOf(gasLimitValue)
         val gasFeeWei = gasPriceWei.multiply(gasLimit)
-        val amountWei = Convert.toWei(amountValue, Convert.Unit.ETHER).toBigInteger()
-        val totalRequiredWei = amountWei.add(gasFeeWei)
 
         // Disable dialog while checking balance
         isOKActionEnabled = false
         rootPane?.cursor = Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR)
 
         // Check balance before prompting for password
+        val isNativeToken = tokenSelector.selectedIndex == 0
+        val selectedToken = if (!isNativeToken && tokenSelector.selectedIndex - 1 < availableTokens.size) {
+            availableTokens[tokenSelector.selectedIndex - 1]
+        } else null
+
         scope.launch {
-            val balanceResult = blockchainService.getBalance(wallet.address, network)
+            // Always need native token for gas
+            val nativeBalanceResult = blockchainService.getBalance(wallet.address, network)
 
             SwingUtilities.invokeLater {
                 rootPane?.cursor = Cursor.getDefaultCursor()
                 isOKActionEnabled = true
 
-                when (balanceResult) {
+                when (nativeBalanceResult) {
                     is BalanceResult.Success -> {
-                        if (balanceResult.balanceWei < totalRequiredWei) {
-                            val balanceFormatted = Convert.fromWei(BigDecimal(balanceResult.balanceWei), Convert.Unit.ETHER)
-                            val totalRequired = Convert.fromWei(BigDecimal(totalRequiredWei), Convert.Unit.ETHER)
-                            val gasFee = Convert.fromWei(BigDecimal(gasFeeWei), Convert.Unit.ETHER)
+                        if (isNativeToken) {
+                            // Native token: check amount + gas fees
+                            val amountWei = Convert.toWei(amountValue, Convert.Unit.ETHER).toBigInteger()
+                            val totalRequiredWei = amountWei.add(gasFeeWei)
 
-                            Messages.showErrorDialog(
-                                project,
-                                """
-                                Insufficient balance for this transaction.
+                            if (nativeBalanceResult.balanceWei < totalRequiredWei) {
+                                val balanceFormatted = Convert.fromWei(BigDecimal(nativeBalanceResult.balanceWei), Convert.Unit.ETHER)
+                                val totalRequired = Convert.fromWei(BigDecimal(totalRequiredWei), Convert.Unit.ETHER)
+                                val gasFee = Convert.fromWei(BigDecimal(gasFeeWei), Convert.Unit.ETHER)
 
-                                Your balance: $balanceFormatted ${network.symbol}
-                                Amount to send: $amountValue ${network.symbol}
-                                Estimated gas fee: $gasFee ${network.symbol}
-                                Total required: $totalRequired ${network.symbol}
-                                """.trimIndent(),
-                                "Insufficient Balance"
-                            )
-                            return@invokeLater
+                                Messages.showErrorDialog(
+                                    project,
+                                    """
+                                    Insufficient balance for this transaction.
+
+                                    Your balance: $balanceFormatted ${network.symbol}
+                                    Amount to send: $amountValue ${network.symbol}
+                                    Estimated gas fee: $gasFee ${network.symbol}
+                                    Total required: $totalRequired ${network.symbol}
+                                    """.trimIndent(),
+                                    "Insufficient Balance"
+                                )
+                                return@invokeLater
+                            }
+
+                            // Balance is sufficient, proceed with password prompt
+                            proceedWithNativeTransaction(toAddress, amountValue, gasLimit, gasPriceWei)
+                        } else {
+                            // ERC20 token: check gas fees only from native balance
+                            if (nativeBalanceResult.balanceWei < gasFeeWei) {
+                                val balanceFormatted = Convert.fromWei(BigDecimal(nativeBalanceResult.balanceWei), Convert.Unit.ETHER)
+                                val gasFee = Convert.fromWei(BigDecimal(gasFeeWei), Convert.Unit.ETHER)
+
+                                Messages.showErrorDialog(
+                                    project,
+                                    """
+                                    Insufficient ${network.symbol} for gas fees.
+
+                                    Your ${network.symbol} balance: $balanceFormatted
+                                    Estimated gas fee: $gasFee ${network.symbol}
+                                    """.trimIndent(),
+                                    "Insufficient Gas"
+                                )
+                                return@invokeLater
+                            }
+
+                            // Check token balance (use stored balance or fetch again)
+                            val tokenAmountWei = amountValue.multiply(BigDecimal(BigInteger.TEN.pow(selectedToken!!.decimals))).toBigInteger()
+                            if (currentBalanceWei < tokenAmountWei) {
+                                Messages.showErrorDialog(
+                                    project,
+                                    """
+                                    Insufficient ${selectedToken.symbol} balance.
+
+                                    Your balance: ${balanceLabel.text}
+                                    Amount to send: $amountValue ${selectedToken.symbol}
+                                    """.trimIndent(),
+                                    "Insufficient Balance"
+                                )
+                                return@invokeLater
+                            }
+
+                            // Balance is sufficient, proceed with token transfer
+                            proceedWithTokenTransaction(selectedToken, toAddress, amountValue, gasLimit, gasPriceWei)
                         }
-
-                        // Balance is sufficient, proceed with password prompt
-                        proceedWithTransaction(toAddress, amountValue, gasLimit, gasPriceWei)
                     }
                     is BalanceResult.Error -> {
                         Messages.showErrorDialog(
                             project,
-                            "Failed to check balance: ${balanceResult.message}",
+                            "Failed to check balance: ${nativeBalanceResult.message}",
                             "Error"
                         )
                     }
@@ -449,7 +545,7 @@ class SendTokenDialog(
         }
     }
 
-    private fun proceedWithTransaction(
+    private fun proceedWithNativeTransaction(
         toAddress: String,
         amountValue: BigDecimal,
         gasLimit: BigInteger,
@@ -534,6 +630,100 @@ class SendTokenDialog(
                     }
                     is TransactionResult.Error -> {
                         Messages.showErrorDialog(project, "Transaction failed: ${result.message}", "Error")
+                    }
+                }
+            }
+        }
+    }
+
+    private fun proceedWithTokenTransaction(
+        token: Token,
+        toAddress: String,
+        amountValue: BigDecimal,
+        gasLimit: BigInteger,
+        gasPrice: BigInteger
+    ) {
+        // Request password for private key
+        val password = Messages.showPasswordDialog(
+            "Enter wallet password to sign transaction:",
+            "Sign Transaction"
+        )
+
+        if (password.isNullOrEmpty()) {
+            return
+        }
+
+        // Get private key
+        val privateKey: String
+        try {
+            privateKey = walletManager.exportPrivateKey(wallet.address, password)
+        } catch (e: Exception) {
+            Messages.showErrorDialog(project, "Invalid password or wallet error: ${e.message}", "Error")
+            return
+        }
+
+        // Confirm transaction
+        val gasPriceGwei = Convert.fromWei(BigDecimal(gasPrice), Convert.Unit.GWEI)
+        val confirmMessage = """
+            Send $amountValue ${token.symbol} to:
+            $toAddress
+
+            Token Contract: ${token.contractAddress}
+            Gas Limit: $gasLimit
+            Gas Price: $gasPriceGwei Gwei
+
+            Continue?
+        """.trimIndent()
+
+        val confirmed = Messages.showYesNoDialog(
+            project,
+            confirmMessage,
+            "Confirm Token Transfer",
+            Messages.getQuestionIcon()
+        )
+
+        if (confirmed != Messages.YES) {
+            return
+        }
+
+        // Disable dialog while sending
+        isOKActionEnabled = false
+        rootPane?.cursor = Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR)
+
+        scope.launch {
+            val result = blockchainService.sendToken(
+                contractAddress = token.contractAddress,
+                toAddress = toAddress,
+                amount = amountValue,
+                decimals = token.decimals,
+                privateKey = privateKey,
+                network = network,
+                gasLimit = gasLimit,
+                gasPrice = gasPrice
+            )
+
+            SwingUtilities.invokeLater {
+                rootPane?.cursor = Cursor.getDefaultCursor()
+                isOKActionEnabled = true
+
+                when (result) {
+                    is TokenTransferResult.Success -> {
+                        val message = buildString {
+                            append("Token transfer sent successfully!\n\n")
+                            append("Transaction Hash:\n${result.transactionHash}\n\n")
+                            result.explorerUrl?.let {
+                                append("View on Explorer:\n$it")
+                            }
+                        }
+                        Messages.showInfoMessage(project, message, "Token Transfer Sent")
+
+                        // Copy tx hash to clipboard
+                        ClipboardUtil.copyToClipboard(result.transactionHash)
+
+                        super.doOKAction()
+                    }
+                    is TokenTransferResult.Error -> {
+                        Messages.showErrorDialog(project, "Token transfer failed: ${result.message}", "Error")
                     }
                 }
             }

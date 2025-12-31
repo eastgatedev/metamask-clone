@@ -47,10 +47,10 @@ In enterprise environments, we never care about "how many chains supported", but
 
 | 考量因素 / Consideration | 🇨🇳 说明 | 🇺🇸 Description |
 |------------------------|---------|-----------------|
-| **协议稳定性** | 不频繁更新，便于长期维护 | Infrequent updates, easy long-term maintenance |
-| **EVM兼容性** | 代码可迁移，生态成熟 | Code portable, mature ecosystem |
-| **工程化支持** | 有成熟的SDK和工具链 | Mature SDKs and toolchains |
-| **人才储备** | 更容易找到有经验的开发者 | Easier to find experienced developers |
+| **协议稳定性 / Protocol Stability** | 不频繁更新，便于长期维护 | Infrequent updates, easy long-term maintenance |
+| **EVM兼容性 / EVM Compatibility** | 代码可迁移，生态成熟 | Code portable, mature ecosystem |
+| **工程化支持 / Engineering Support** | 有成熟的SDK和工具链 | Mature SDKs and toolchains |
+| **人才储备 / Talent Pool** | 更容易找到有经验的开发者 | Easier to find experienced developers |
 
 ### Web3j的定位 / Web3j's Position
 
@@ -79,9 +79,9 @@ This episode uses **BSC Testnet** as teaching environment, not to teach BSC ecos
 | 优势 / Advantage | 🇨🇳 说明    | 🇺🇸 Description                     |
 |-----------------|------------|--------------------------------------|
 | **Ethereum Fork** | 100% EVM兼容 | 100% EVM compatible                  |
-| **快速出块** | 1秒出块，调试高效  | 1-second blocks, efficient debugging |
-| **协议稳定** | 大型更新不频繁    | Infrequent major updates             |
-| **适合学习** | 专注EVM底层流程  | Focus on EVM underlying process      |
+| **快速出块 / Fast Blocks** | 1秒出块，调试高效  | 1-second blocks, efficient debugging |
+| **协议稳定 / Stable Protocol** | 大型更新不频繁    | Infrequent major updates             |
+| **适合学习 / Good for Learning** | 专注EVM底层流程  | Focus on EVM underlying process      |
 
 ### 重要说明 / Important Note
 
@@ -179,9 +179,9 @@ fun formatBalance(balanceWei: BigInteger): String {
 
 | 要点 / Point | 🇨🇳 说明 | 🇺🇸 Description |
 |-------------|---------|-----------------|
-| **method名称** | `eth_getBalance`是Ethereum JSON-RPC规范的一部分 | `eth_getBalance` is part of Ethereum JSON-RPC spec |
-| **不是SDK发明的** | 不是Web3j或Web3.js的API | Not invented by Web3j or Web3.js |
-| **返回格式** | Hex格式，单位是Wei | Hex format, unit is Wei |
+| **method名称 / Method Name** | `eth_getBalance`是Ethereum JSON-RPC规范的一部分 | `eth_getBalance` is part of Ethereum JSON-RPC spec |
+| **不是SDK发明的 / Not SDK Invented** | 不是Web3j或Web3.js的API | Not invented by Web3j or Web3.js |
+| **返回格式 / Return Format** | Hex格式，单位是Wei | Hex format, unit is Wei |
 
 ---
 
@@ -199,7 +199,7 @@ The returned data is in Hex format Wei, we need to understand how to convert:
 |-----------|---------|-----------------|
 | **1. Hex → Decimal** | 16进制转10进制 | Convert hex to decimal |
 | **2. Wei → Ether** | 除以 10^18 | Divide by 10^18 |
-| **3. 格式化** | 保留合适的小数位 | Keep appropriate decimal places |
+| **3. 格式化 / Format** | 保留合适的小数位 | Keep appropriate decimal places |
 
 ### 在线转换工具 / Online Converters
 - [Base Converter](https://www.rapidtables.com/convert/number/base-converter.html)
@@ -465,5 +465,5 @@ Phase 4: Advanced Features                 📋 PLANNED
 
 **🎥 YouTube Series:** [AI + IntelliJ Plugin + Web3 (MetaMask Clone)](https://github.com/eastgatedev/metamask-clone)  
 **👨‍💻 Author:** 东门Eastgate  
-**📅 Last Updated:** 2025-09-06  
+**📅 Last Updated:** 2025-12-20  
 **⭐ Star the Repo:** [eastgatedev/metamask-clone](https://github.com/eastgatedev/metamask-clone)

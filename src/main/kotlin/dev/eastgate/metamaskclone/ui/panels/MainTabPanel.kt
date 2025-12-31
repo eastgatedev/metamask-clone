@@ -19,6 +19,7 @@ class MainTabPanel : JPanel() {
 
     var onAddTokenClick: (() -> Unit)? = null
     var onTokenSelected: ((Token) -> Unit)? = null
+    var onDeleteToken: ((Token) -> Unit)? = null
 
     private val tabsPanel = JPanel(FlowLayout(FlowLayout.CENTER, 20, 0))
     private val contentPanel = JPanel(CardLayout())
@@ -49,6 +50,7 @@ class MainTabPanel : JPanel() {
         // Wire up token list events
         tokenListPanel.onAddTokenClick = { onAddTokenClick?.invoke() }
         tokenListPanel.onTokenSelected = { token -> onTokenSelected?.invoke(token) }
+        tokenListPanel.onDeleteToken = { token -> onDeleteToken?.invoke(token) }
 
         add(tabsPanel, BorderLayout.NORTH)
         add(contentPanel, BorderLayout.CENTER)

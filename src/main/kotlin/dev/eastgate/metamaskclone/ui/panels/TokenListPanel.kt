@@ -16,12 +16,15 @@ import javax.swing.BorderFactory
 import javax.swing.Box
 import javax.swing.BoxLayout
 import javax.swing.JButton
+import javax.swing.JMenuItem
 import javax.swing.JPanel
+import javax.swing.JPopupMenu
 
 class TokenListPanel : JPanel() {
 
     var onTokenSelected: ((Token) -> Unit)? = null
     var onAddTokenClick: (() -> Unit)? = null
+    var onDeleteToken: ((Token) -> Unit)? = null
 
     private val tokenListContainer = JPanel()
     private var tokens: List<Token> = emptyList()
@@ -134,10 +137,15 @@ class TokenListPanel : JPanel() {
         row.add(leftPanel, BorderLayout.WEST)
         row.add(rightPanel, BorderLayout.EAST)
 
+        // Right-click context menu
+        row.componentPopupMenu = createTokenPopupMenu(token)
+
         // Click listener
         row.addMouseListener(object : MouseAdapter() {
             override fun mouseClicked(e: MouseEvent) {
-                onTokenSelected?.invoke(token)
+                if (e.button == MouseEvent.BUTTON1) {
+                    onTokenSelected?.invoke(token)
+                }
             }
 
             override fun mouseEntered(e: MouseEvent) {
@@ -150,6 +158,18 @@ class TokenListPanel : JPanel() {
         })
 
         return row
+    }
+
+    private fun createTokenPopupMenu(token: Token): JPopupMenu {
+        val popup = JPopupMenu()
+
+        val deleteItem = JMenuItem("Delete Token")
+        deleteItem.addActionListener {
+            onDeleteToken?.invoke(token)
+        }
+        popup.add(deleteItem)
+
+        return popup
     }
 
     fun getTokens(): List<Token> = tokens
