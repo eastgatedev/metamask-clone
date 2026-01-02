@@ -21,7 +21,6 @@ import javax.swing.JPanel
 import javax.swing.JPopupMenu
 
 class TokenListPanel : JPanel() {
-
     var onTokenSelected: ((Token) -> Unit)? = null
     var onAddTokenClick: (() -> Unit)? = null
     var onDeleteToken: ((Token) -> Unit)? = null

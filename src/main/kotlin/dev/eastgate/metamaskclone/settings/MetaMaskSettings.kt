@@ -11,7 +11,6 @@ import com.intellij.util.xmlb.XmlSerializerUtil
     storages = [Storage("MetaMaskCloneSettings.xml")]
 )
 class MetaMaskSettings : PersistentStateComponent<MetaMaskSettings> {
-    
     var defaultNetwork: String = "BNB_TESTNET"
     var showTestnetWarning: Boolean = true
     var autoLockTimeout: Int = 10 // minutes
@@ -26,15 +25,15 @@ class MetaMaskSettings : PersistentStateComponent<MetaMaskSettings> {
     var priceUpdateInterval: Long = 60000 // milliseconds
     var showBalanceInUSD: Boolean = true
     var defaultSlippage: Double = 0.5 // percentage
-    
+
     override fun getState(): MetaMaskSettings {
         return this
     }
-    
+
     override fun loadState(state: MetaMaskSettings) {
         XmlSerializerUtil.copyBean(state, this)
     }
-    
+
     companion object {
         val instance: MetaMaskSettings
             get() = service()

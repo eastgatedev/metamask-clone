@@ -16,7 +16,6 @@ import javax.swing.JButton
 import javax.swing.JPanel
 
 class WalletSelectorBar : JPanel() {
-
     var onWalletClick: (() -> Unit)? = null
     var onCopyAddress: ((String) -> Unit)? = null
 

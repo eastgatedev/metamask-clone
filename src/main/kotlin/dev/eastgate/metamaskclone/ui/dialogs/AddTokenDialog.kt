@@ -30,7 +30,6 @@ class AddTokenDialog(
     private val blockchainService: BlockchainService,
     private val existingToken: Token? = null
 ) : DialogWrapper(project) {
-
     private val contractAddressField = JBTextField()
     private val symbolField = JBTextField()
     private val nameField = JBTextField()

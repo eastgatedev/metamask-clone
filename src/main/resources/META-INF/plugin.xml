@@ -1,27 +1,151 @@
 <!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
 <idea-plugin>
     <!-- Unique identifier of the plugin. It should be FQN. It cannot be changed between the plugin versions. -->
-    <id>dev.eastgate.metamaskclone</id>
+    <id>dev.eastgate.wallet.metamaskclone</id>
 
     <!-- Public plugin name should be written in Title Case.
          Guidelines: https://plugins.jetbrains.com/docs/marketplace/best-practices-for-listing.html#plugin-name -->
-    <name>MetaMask Clone</name>
+    <name>MetaMask Clone (Showcase)</name>
 
     <!-- A displayed Vendor name or Organization ID displayed on the Plugins Page. -->
-    <vendor url="https://github.com/eastgatedev">Eastgate</vendor>
+    <vendor email="eastgate3194@gmail.com" url="https://github.com/eastgatedev/metamask-clone">Development</vendor>
 
     <!-- Description of the plugin displayed on the Plugin Page and IDE Plugin Manager.
          Guidelines: https://plugins.jetbrains.com/docs/marketplace/best-practices-for-listing.html#plugin-description -->
     <description><![CDATA[
-        EVM Blockchain interaction tool for IntelliJ IDEA<br/>
-        <br/>
-        Features:<br/>
-        • Multi-wallet management with secure storage<br/>
-        • Support for Ethereum and BNB chains<br/>
-        • ERC20 token management<br/>
-        • Transaction history tracking<br/>
-        • Testnet-first approach for safety<br/>
+        <h1>Metamask Clone – Wallet Architecture Showcase</h1>
+
+        <h2>Overview</h2>
+        <p>
+            <strong>Metamask Clone – Wallet Architecture Showcase</strong> is an
+            <strong>educational IntelliJ IDEA plugin</strong> designed to demonstrate
+            how a wallet-like system can be modeled inside an IDE environment.
+        </p>
+
+        <p>
+            This plugin is a <strong>technical showcase</strong>, focusing on
+            <strong>architecture, data flow, and system design</strong>,
+            rather than a consumer-ready product.
+        </p>
+
+        <p>
+            <strong>Important:</strong><br/>
+            This is <strong>NOT</strong> a production wallet.<br/>
+            No real funds are involved.
+        </p>
+
+        <h2>Purpose</h2>
+        <p>
+            This plugin exists for <strong>learning and demonstration purposes only</strong>,
+            aimed at developers and system architects who want to understand:
+        </p>
+
+        <ul>
+            <li>How a wallet-style system can be structured</li>
+            <li>How transaction flows are modeled internally</li>
+            <li>How backend concepts map to UI components</li>
+            <li>How to build non-trivial IntelliJ plugins</li>
+        </ul>
+
+        <p>
+            It is <strong>not intended</strong> for real asset management or end-user usage.
+        </p>
+
+        <h2>Key Characteristics</h2>
+        <ul>
+            <li>Educational / showcase-oriented plugin</li>
+            <li>No real blockchain interaction</li>
+            <li>No custody of private keys</li>
+            <li>No security guarantees</li>
+            <li>No financial functionality</li>
+        </ul>
+
+        <p>
+            All behaviors are either simulated or simplified for clarity.
+        </p>
+
+        <h2>Intended Audience</h2>
+        <ul>
+            <li>Backend engineers</li>
+            <li>Plugin developers</li>
+            <li>System architects</li>
+            <li>Developers learning wallet system architecture</li>
+            <li>Developers interested in IntelliJ Plugin development</li>
+        </ul>
+
+        <h2>Important Disclaimer</h2>
+        <p>
+            This plugin is <strong>not affiliated with, endorsed by, or connected to</strong>
+            MetaMask or any related organization.
+        </p>
+
+        <p>
+            The term <strong>“Metamask Clone”</strong> is used
+            <strong>solely as a descriptive reference</strong>
+            to indicate architectural inspiration and learning context.
+        </p>
+
+        <h2>Licensing &amp; Responsibility</h2>
+        <p>
+            By installing this plugin, you acknowledge that:
+        </p>
+
+        <ul>
+            <li>This plugin is provided <strong>as-is</strong></li>
+            <li>It should <strong>not</strong> be used for managing real assets</li>
+            <li>The author assumes <strong>no responsibility</strong> for misuse</li>
+        </ul>
+
+        <h2>Why This Plugin Exists</h2>
+        <p>
+            This plugin is part of a broader educational effort to explain
+            <strong>wallet system design from a backend and architectural perspective</strong>,
+            not to replicate or replace any existing product.
+        </p>
+
+        <h2>Video Tutorial</h2>
+        <p>
+            Learn how to build this plugin step-by-step with our comprehensive video tutorial series:
+        </p>
+        <p>
+            <a href="https://www.youtube.com/playlist?list=PLbqZIOzRvr8mrKmli_WOVogsUTawr9dML">Watch the Tutorial Series on YouTube</a>
+        </p>
+
+        <hr/>
+
+        <p>
+            <strong>Summary for reviewers:</strong>
+        </p>
+
+        <ul>
+            <li>Educational / demo plugin</li>
+            <li>No misleading claims</li>
+            <li>No real asset handling</li>
+            <li>Clear non-affiliation disclaimer</li>
+        </ul>
+
     ]]></description>
+
+    <change-notes>
+    <![CDATA[
+    <h2>Version 1.0</h2>
+
+    <ul>
+      <li>Initial release of the educational showcase plugin</li>
+      <li>Introduced basic wallet-style UI for architectural demonstration</li>
+      <li>Added simulated account and transaction flow examples</li>
+      <li>Implemented foundational IntelliJ Tool Window integration</li>
+      <li>Focused on plugin structure, data flow, and system design concepts</li>
+    </ul>
+
+    <p>
+    This initial version is intended solely for
+    <strong>educational and demonstration purposes</strong>.
+    All behaviors are simulated and simplified.
+    </p>
+
+    ]]>
+    </change-notes>
 
     <!-- Product and plugin compatibility requirements.
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
@@ -31,18 +155,19 @@
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
     <extensions defaultExtensionNs="com.intellij">
         <!-- Tool Window -->
-        <toolWindow id="MetaMask Clone" 
-                   secondary="true" 
-                   anchor="right" 
+        <toolWindow id="MetaMask Clone"
+                   secondary="true"
+                   anchor="right"
+                   doNotActivateOnStart="true"
                    factoryClass="dev.eastgate.metamaskclone.ui.MetaMaskToolWindowFactory"
                    icon="/META-INF/pluginIcon.svg"/>
-        
+
         <!-- Project Settings -->
-        <projectConfigurable parentId="tools" 
+        <projectConfigurable parentId="tools"
                            instance="dev.eastgate.metamaskclone.settings.MetaMaskConfigurable"
                            id="dev.eastgate.metamaskclone.settings"
                            displayName="MetaMask Clone"/>
-        
+
         <!-- Project Service for Data Persistence -->
         <projectService serviceImplementation="dev.eastgate.metamaskclone.core.storage.ProjectStorage"/>
     </extensions>

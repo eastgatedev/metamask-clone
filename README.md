@@ -1,176 +1,117 @@
-# MetaMask Clone - IntelliJ IDEA Plugin
+# MetaMask Clone - Wallet Architecture Showcase
 
-A demonstration project showcasing how to build an EVM blockchain wallet management plugin for IntelliJ IDEA, inspired by MetaMask functionality.
+An **educational IntelliJ IDEA plugin** demonstrating how a wallet-like system can be modeled inside an IDE environment. This is a **technical showcase** focusing on architecture, data flow, and system design.
 
-## 🎯 Overview
+## Important Notice
 
-This is a **MetaMask Clone** built as an IntelliJ IDEA plugin using **Kotlin**. It provides blockchain wallet management capabilities directly within your IDE, demonstrating how to integrate Web3 functionality into development tools.
+**This is NOT a production wallet. No real funds are involved.**
 
-## 🛠️ Tech Stack
+This plugin is **not affiliated with, endorsed by, or connected to** MetaMask or any related organization. The term "MetaMask Clone" is used **solely as a descriptive reference** to indicate architectural inspiration and learning context.
+
+## Purpose
+
+This plugin exists for **learning and demonstration purposes only**, aimed at developers and system architects who want to understand:
+
+- How a wallet-style system can be structured
+- How transaction flows are modeled internally
+- How backend concepts map to UI components
+- How to build non-trivial IntelliJ plugins
+
+## Key Characteristics
+
+- Educational / showcase-oriented plugin
+- No real blockchain interaction (simulated or simplified)
+- No custody of private keys
+- No security guarantees
+- No financial functionality
+
+All behaviors are either simulated or simplified for clarity.
+
+## Intended Audience
+
+- Backend engineers
+- Plugin developers
+- System architects
+- Developers learning wallet system architecture
+- Developers interested in IntelliJ Plugin development
+
+## Tech Stack
 
 - **Language:** Kotlin 2.2.10
 - **Platform:** IntelliJ IDEA Plugin SDK
 - **Target JDK:** 21
 - **Target IntelliJ:** 2025.1
 - **Build Tool:** Gradle
-- **Blockchain:** Web3j for EVM interaction
 
-## 📺 Video Tutorial
+## Video Tutorial
 
-🎥 **YouTube Tutorial Available!** 
-
-Learn how to build this plugin step-by-step with our comprehensive video tutorial series.
+Learn how to build this plugin step-by-step with our comprehensive video tutorial series:
 
 [Watch the Tutorial Series](https://youtube.com/playlist?list=PLbqZIOzRvr8mrKmli_WOVogsUTawr9dML&si=6c4ZE7E6WmiuzqaR)
 
-## ✨ Features
-
-### Phase 1 - Basic Wallet Management ✅
-- ✅ Create new wallets
-- ✅ Import existing wallets via private key
-- ✅ Export private keys (password-protected)
-- ✅ Secure wallet storage with AES-256 encryption
-- ✅ Project-level data persistence
-- ✅ Clean, professional UI integrated as IntelliJ tool window
-
-### Phase 2 - Network Management ✅
-- ✅ Network selector bar with current network display
-- ✅ Support for multiple EVM networks (Ethereum, BNB Chain, Polygon)
-- ✅ Switch between Mainnet and Testnet networks
-- ✅ Add custom RPC networks (supports localhost for development)
-- ✅ Enable/disable predefined networks
-- ✅ BNB Testnet as default network
-- ✅ Network selection persists across IDE restarts
-
-### Phase 3 - UI Components ✅ (UI Ready, Blockchain Integration Pending)
-- ✅ Wallet selector dropdown with quick wallet switching
-- ✅ Balance display panel (placeholder - blockchain integration pending)
-- ✅ Send/Receive action buttons
-- ✅ Token list with add custom token support
-- ✅ Tokens/Activity tab navigation
-- ✅ Send transaction dialog (UI only)
-- ✅ Receive dialog with QR code generation
-- ✅ Add token dialog
-
-### Upcoming Features
-- 🔜 Blockchain integration (fetch real balances)
-- 🔜 Send/receive transactions (actual blockchain calls)
-- 🔜 Token balance fetching
-- 🔜 Transaction history
-- 🔜 Mnemonic phrase support (BIP39)
-- 🔜 Smart contract interaction
-
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 - IntelliJ IDEA 2025.1 or later
 - JDK 21
 - Gradle 8.x
 
-### Installation
+### Build
 
-1. Clone the repository:
 ```bash
 git clone https://github.com/eastgatedev/metamask-clone.git
 cd metamask-clone
-```
-
-2. Build the plugin:
-```bash
 ./gradlew build
 ```
 
-3. Run the plugin in a test IntelliJ instance:
+### Run in Test IDE
+
 ```bash
 ./gradlew runIde
 ```
 
-### Usage
-
-1. After installation, find the **MetaMask Clone** tool window on the right side of IntelliJ IDEA
-2. **Network Selection**: Click the network bar at the top to switch between networks (BNB Testnet is default)
-3. **Wallet Management**: Click the wallet dropdown to:
-   - Create a new wallet
-   - Import an existing wallet using a private key
-   - Switch between wallets
-   - Export private key (password required)
-   - Delete wallet
-4. **Send/Receive**: Use the Send and Receive buttons for transaction dialogs
-5. **Token Management**: Go to the Tokens tab to add and manage custom tokens
-6. **Custom Networks**: Add custom RPC networks including localhost for smart contract development
-
-## 🏗️ Project Structure
+## Project Structure
 
 ```
 metamask-clone/
 ├── src/main/kotlin/dev/eastgate/metamaskclone/
 │   ├── core/
 │   │   ├── wallet/           # Wallet management logic
-│   │   ├── network/          # Network management (NetworkManager, PredefinedNetworks)
+│   │   ├── network/          # Network management
+│   │   ├── blockchain/       # Blockchain service (simulated)
 │   │   └── storage/          # Data persistence & encryption
-│   ├── models/               # Data models (Wallet, Token)
+│   ├── models/               # Data models
 │   ├── ui/
-│   │   ├── MetaMaskToolWindow.kt  # Main UI component
-│   │   ├── panels/           # UI panels (NetworkSelector, WalletSelector, Balance, Tokens, etc.)
-│   │   └── dialogs/          # Dialogs (CreateWallet, Import, Send, Receive, AddToken, etc.)
+│   │   ├── panels/           # UI panels
+│   │   └── dialogs/          # Dialogs
 │   ├── settings/             # Plugin settings
 │   └── utils/                # Utility classes
 ├── src/main/resources/
 │   └── META-INF/
 │       └── plugin.xml        # Plugin configuration
-├── docs/
-│   ├── tasks/                # Implementation plans
-│   └── ui/                   # UI reference screenshots
 └── build.gradle.kts          # Build configuration
 ```
 
-## 🔧 Development
+## Disclaimer
 
-### Building
-```bash
-# Clean build
-./gradlew clean build
+This project is provided **as-is** for educational purposes only.
 
-# Build without tests
-./gradlew build -x test
-```
+- It should **not** be used for managing real assets
+- The author assumes **no responsibility** for misuse
+- This is part of an educational effort to explain wallet system design from a backend and architectural perspective
 
-### Key Dependencies
-- **Web3j** - Ethereum blockchain interaction
-- **BouncyCastle** - Cryptographic operations
-- **BitcoinJ** - HD wallet generation
-- **ZXing** - QR code generation
-- **Kotlin Coroutines** - Async operations (provided by IntelliJ Platform)
-
-### Supported Networks
-
-| Network | Chain ID | Type |
-|---------|----------|------|
-| Ethereum Mainnet | 1 | Mainnet |
-| Ethereum Sepolia | 11155111 | Testnet |
-| BNB Smart Chain | 56 | Mainnet |
-| BNB Testnet | 97 | Testnet (Default) |
-| Polygon | 137 | Mainnet |
-| Polygon Mumbai | 80001 | Testnet |
-
-Custom networks can be added with any RPC URL (including localhost for local development).
-
-## 📝 License
+## License
 
 This project is for educational purposes and demonstration only.
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
-## 📧 Contact
+## Contact
 
 For questions about the tutorial or project, please open an issue on GitHub.
 
-## ⚠️ Disclaimer
-
-This is a demonstration project for educational purposes. It should not be used for managing real cryptocurrency assets without proper security auditing and testing.
-
 ---
 
-**Made with ❤️ for the Kotlin & IntelliJ Plugin Development Community**
+**Summary:** Educational / demo plugin. No misleading claims. No real asset handling. Clear non-affiliation disclaimer.

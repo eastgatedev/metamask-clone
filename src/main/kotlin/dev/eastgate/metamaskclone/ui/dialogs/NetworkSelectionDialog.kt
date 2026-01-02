@@ -17,7 +17,6 @@ class NetworkSelectionDialog(
     private val project: Project,
     private val networkManager: NetworkManager
 ) : DialogWrapper(project) {
-
     private var selectedNetwork: Network? = null
     private val contentPanel = JPanel()
 
@@ -85,7 +84,10 @@ class NetworkSelectionDialog(
         return label
     }
 
-    private fun createNetworkRow(network: Network, isEnabled: Boolean): JComponent {
+    private fun createNetworkRow(
+        network: Network,
+        isEnabled: Boolean
+    ): JComponent {
         val row = JPanel(BorderLayout())
         row.alignmentX = Component.LEFT_ALIGNMENT
         row.maximumSize = Dimension(Int.MAX_VALUE, 50)
@@ -201,7 +203,10 @@ class NetworkSelectionDialog(
         return row
     }
 
-    private fun showNetworkMenu(network: Network, component: JComponent) {
+    private fun showNetworkMenu(
+        network: Network,
+        component: JComponent
+    ) {
         val popup = JPopupMenu()
 
         if (networkManager.isCustomNetwork(network.id)) {
@@ -250,7 +255,7 @@ class NetworkSelectionDialog(
         return when {
             network.symbol.equals("ETH", ignoreCase = true) -> "E"
             network.symbol.equals("BNB", ignoreCase = true) ||
-            network.symbol.equals("tBNB", ignoreCase = true) -> "B"
+                network.symbol.equals("tBNB", ignoreCase = true) -> "B"
             network.symbol.equals("MATIC", ignoreCase = true) -> "P"
             else -> network.symbol.firstOrNull()?.uppercase() ?: "?"
         }

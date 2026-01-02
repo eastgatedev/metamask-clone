@@ -14,7 +14,6 @@ import javax.swing.BorderFactory
 import javax.swing.JPanel
 
 class NetworkSelectorBar : JPanel() {
-
     var onNetworkClick: (() -> Unit)? = null
 
     private val networkIconLabel = JBLabel()
@@ -119,7 +118,7 @@ class NetworkSelectorBar : JPanel() {
         return when {
             network.symbol.equals("ETH", ignoreCase = true) -> "E"
             network.symbol.equals("BNB", ignoreCase = true) ||
-            network.symbol.equals("tBNB", ignoreCase = true) -> "B"
+                network.symbol.equals("tBNB", ignoreCase = true) -> "B"
             network.symbol.equals("MATIC", ignoreCase = true) -> "P"
             else -> network.symbol.firstOrNull()?.uppercase() ?: "?"
         }

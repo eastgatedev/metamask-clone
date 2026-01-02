@@ -1,0 +1,53 @@
+# Editor configuration, see https://editorconfig.org
+root = true
+
+[*]
+charset = utf-8
+indent_style = space
+indent_size = 4
+insert_final_newline = true
+trim_trailing_whitespace = true
+max_line_length = 160
+
+[{*.kt,*.kts}]
+# https://pinterest.github.io/ktlint/latest/rules/code-styles/
+ktlint_code_style = ktlint_official
+ktlint_standard_binary-expression-wrapping = disabled
+ktlint_standard_blank-line-before-declaration = disabled
+ktlint_function_signature_body_expression_wrapping = default
+ktlint_function_signature_body_expression_wrapping = multiline
+ktlint_standard_enum-wrapping = disabled
+ktlint_standard_multiline-if-else = disabled
+ktlint_standard_multiline-expression-wrapping = disabled
+ktlint_standard_no-blank-line-in-list = disabled
+ktlint_standard_spacing-between-function-name-and-opening-parenthesis = disabled
+ktlint_standard_string-template-indent = disabled
+ij_kotlin_allow_trailing_comma = false
+ij_kotlin_allow_trailing_comma_on_call_site = false
+
+# upgrade org.jlleitschuh.gradle.ktlint 12.3.0
+ktlint_standard_class-signature = disabled
+ktlint_standard_chain-wrapping = disabled
+ktlint_standard_function-expression-body = disabled
+ktlint_standard_condition-wrapping = disabled
+ktlint_standard_multiline-loop = disabled
+ktlint_standard_binary-expression-wrapping = disabled
+ktlint_standard_chain-method-continuation = disabled
+
+[{*.ts,*.js}]
+quote_type = single
+indent_size = 2
+
+[{*.xml,*.yml}]
+indent_size = 2
+max_line_length = off
+
+[*.json]
+indent_size = 2
+
+[*.md]
+max_line_length = off
+trim_trailing_whitespace = false
+
+[*.html]
+indent_size = 4

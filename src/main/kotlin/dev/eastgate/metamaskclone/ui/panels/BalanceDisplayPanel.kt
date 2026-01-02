@@ -14,7 +14,6 @@ import javax.swing.JPanel
 import javax.swing.SwingConstants
 
 class BalanceDisplayPanel : JPanel() {
-
     private val balanceLabel = JBLabel()
     private val usdValueLabel = JBLabel()
     private val refreshButton = JButton("\u21BB") // Refresh symbol
@@ -106,7 +105,11 @@ class BalanceDisplayPanel : JPanel() {
     /**
      * Update balance display with fetched values.
      */
-    fun updateBalance(balance: String, symbol: String, usdValue: String?) {
+    fun updateBalance(
+        balance: String,
+        symbol: String,
+        usdValue: String?
+    ) {
         balanceLabel.text = formatBalance(balance, symbol)
         usdValueLabel.foreground = JBColor.gray // Reset from potential error state
         refreshButton.isEnabled = true
@@ -123,7 +126,10 @@ class BalanceDisplayPanel : JPanel() {
         repaint()
     }
 
-    private fun formatBalance(balance: String, symbol: String): String {
+    private fun formatBalance(
+        balance: String,
+        symbol: String
+    ): String {
         val balanceValue = try {
             balance.toBigDecimalOrNull()?.let { value ->
                 if (value.scale() > 6) {

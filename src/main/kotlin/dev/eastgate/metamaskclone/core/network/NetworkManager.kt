@@ -9,7 +9,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import java.util.concurrent.ConcurrentHashMap
 
 class NetworkManager private constructor(private val project: Project) {
-
     private val storage = ProjectStorage.getInstance(project)
 
     private val _selectedNetwork = MutableStateFlow<Network>(getInitialNetwork())

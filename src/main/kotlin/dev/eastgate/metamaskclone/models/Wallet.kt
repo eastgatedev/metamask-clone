@@ -21,7 +21,7 @@ data class Wallet(
             address
         }
     }
-    
+
     fun isValid(): Boolean {
         return address.startsWith("0x") && address.length == 42
     }

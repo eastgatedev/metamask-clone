@@ -1,12 +1,12 @@
 package dev.eastgate.metamaskclone.ui.dialogs
 
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.qrcode.QRCodeWriter
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBLabel
 import com.intellij.util.ui.JBUI
-import com.google.zxing.BarcodeFormat
-import com.google.zxing.qrcode.QRCodeWriter
 import dev.eastgate.metamaskclone.models.Wallet
 import dev.eastgate.metamaskclone.utils.ClipboardUtil
 import java.awt.BorderLayout
@@ -22,7 +22,6 @@ class ReceiveDialog(
     private val project: Project,
     private val wallet: Wallet
 ) : DialogWrapper(project) {
-
     init {
         title = "Receive"
         init()
@@ -70,7 +69,8 @@ class ReceiveDialog(
         buttonPanel.add(copyButton)
 
         // Warning
-        val warningLabel = JBLabel("<html><center><small>Only send tokens on the same network.<br/>Sending to wrong network may result in loss.</small></center></html>")
+        val warningLabel =
+            JBLabel("<html><center><small>Only send tokens on the same network.<br/>Sending to wrong network may result in loss.</small></center></html>")
         warningLabel.horizontalAlignment = SwingConstants.CENTER
         warningLabel.foreground = JBColor(0xFF9800.toInt(), 0xFFB74D.toInt())
         warningLabel.border = JBUI.Borders.emptyTop(15)
@@ -116,7 +116,11 @@ class ReceiveDialog(
         return panel
     }
 
-    private fun generateQRCode(content: String, width: Int, height: Int): BufferedImage {
+    private fun generateQRCode(
+        content: String,
+        width: Int,
+        height: Int
+    ): BufferedImage {
         val qrCodeWriter = QRCodeWriter()
         val bitMatrix = qrCodeWriter.encode(content, BarcodeFormat.QR_CODE, width, height)
 

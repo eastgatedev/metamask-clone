@@ -1,101 +1,55 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code when working with this repository.
 
 ## Project Overview
 
-This is a **MetaMask Clone IntelliJ Plugin** that provides EVM blockchain wallet management directly within IntelliJ IDEA. Built with Kotlin 2.2.10, targeting JDK 21, and IntelliJ Platform 2025.1.
+**MetaMask Clone IntelliJ Plugin** - EVM blockchain wallet management for IntelliJ IDEA.
 
-**Package:** `dev.eastgate.metamaskclone`  
-**Plugin ID:** `dev.eastgate.metamaskclone`
+- **Kotlin:** 2.2.10
+- **JDK:** 21
+- **IntelliJ Platform:** 2025.1
+- **Package:** `dev.eastgate.metamaskclone`
+- **Plugin ID:** `dev.eastgate.wallet.metamaskclone`
 
-## Common Commands
+## Commands
 
 ```bash
-# Build the project
-./gradlew build
-
-# Run the plugin in test IntelliJ instance (DO NOT USE after code changes - resource intensive)
-./gradlew runIde
-
-# Clean build
-./gradlew clean build
+./gradlew build          # Build the project
+./gradlew clean build    # Clean build
+./gradlew buildPlugin    # Build distributable plugin zip
+./gradlew verifyPlugin   # Verify plugin compatibility (REQUIRED before Marketplace submission)
 ```
 
-**Important:** Avoid running `./gradlew runIde` after making code changes as it's resource-intensive. Only use `./gradlew build` to verify compilation.
+**Avoid** `./gradlew runIde` - resource intensive. Use `./gradlew build` to verify compilation.
 
-## Architecture Overview
+## Key Warnings
 
-### Core Components
+**CRITICAL - No Internal API:** Do NOT use any IntelliJ Internal API (`@ApiStatus.Internal`). JetBrains Marketplace will REJECT plugins that use internal APIs. Always run `./gradlew verifyPlugin` before submission to check for:
+- Internal API usages
+- Deprecated API usages
+- Experimental API usages
 
-**WalletManager** (`core/wallet/WalletManager.kt`)
-- Singleton pattern per IntelliJ project
-- Manages wallet CRUD operations using Kotlin StateFlow for reactive updates
-- Integrates with ProjectStorage for persistence
+**Kotlin JVM Default:** The project uses `-Xjvm-default=all` compiler option to avoid generating bridge methods that trigger internal API warnings from interface defaults (e.g., `ToolWindowFactory`).
 
-**ProjectStorage** (`core/storage/ProjectStorage.kt`) 
-- IntelliJ service for project-level data persistence
-- Stores encrypted wallet data in XML format using IntelliJ's state management
-- Implements `PersistentStateComponent` pattern
+**ToolWindowFactory:** Do NOT override deprecated methods. Use plugin.xml attributes instead:
+- `doNotActivateOnStart="true"` instead of `isDoNotActivateOnStart()`
+- `anchor="right"` instead of `getAnchor()`
+- `icon="..."` instead of `getIcon()`
 
-**UI Architecture** (`ui/MetaMaskToolWindow.kt`)
-- Simple BorderLayout with three main sections:
-  - Title bar (North)
-  - SimpleWalletListPanel (North of content)
-  - WalletInfoPanel (Center of content) 
-  - ActionButtonPanel (South of content)
-- Uses Kotlin Coroutines with StateFlow for reactive UI updates
-- SwingUtilities.invokeLater for thread-safe UI updates
+**Coroutines:** Do NOT add explicit coroutine dependencies - they're provided by IntelliJ Platform. Adding them causes `CoroutineExceptionHandler` conflicts.
 
-### Key Patterns
-
-**Reactive State Management:**
-- WalletManager exposes `StateFlow<List<Wallet>>` for wallet list
-- UI components observe state changes via coroutines
-- All UI updates happen on EDT using SwingUtilities.invokeLater
-
-**Encryption & Security:**
-- Private keys encrypted with AES-256 via EncryptionUtil
-- Project-level data isolation 
-- Password-protected operations
-
-**Plugin Integration:**
-- Tool window registered in plugin.xml as right-side panel
-- Project service for storage
-- Settings configurable via IntelliJ settings
-
-## Critical Dependencies
-
+**BouncyCastle:** BitcoinJ must exclude BouncyCastle to avoid conflicts:
 ```kotlin
-// Blockchain libraries - Web3j for EVM interaction
-implementation("org.web3j:core:4.10.3")
-
-// Encryption - BouncyCastle
-implementation("org.bouncycastle:bcprov-jdk18on:1.78") 
-
-// Wallet generation - BitcoinJ (excludes conflicting BouncyCastle)
 implementation("org.bitcoinj:bitcoinj-core:0.16.2") {
     exclude(group = "org.bouncycastle")
 }
 ```
 
-**Coroutines:** Do NOT add explicit coroutine dependencies - they're provided by IntelliJ Platform and adding them causes `CoroutineExceptionHandler` conflicts.
+## Architecture
 
-## Development Phase Status
-
-**Phase 1 - Complete:** Basic wallet management with clean, professional UI
-- Simple wallet list showing names only
-- Basic wallet info panel (name, address, created date)  
-- Three action buttons: Create, Import, Export Private Key
-- All data persisted at project level with encryption
-
-**Future Phases:** Mnemonic support, network management, blockchain integration, transaction history
-
-## UI Design Principles
-
-The current UI follows a clean, minimal design:
-- Single-panel layout (no complex split panes)
-- Professional appearance with proper spacing
-- Essential functionality only for Phase 1
-- Titled borders for section separation
-- Consistent button sizing and tooltips
+- **WalletManager** - Singleton per project, manages wallets with StateFlow
+- **NetworkManager** - Manages EVM network selection
+- **BlockchainService** - Web3j integration for blockchain calls
+- **ProjectStorage** - PersistentStateComponent for encrypted data persistence
+- **MetaMaskToolWindow** - Main UI with coroutine-based state observation

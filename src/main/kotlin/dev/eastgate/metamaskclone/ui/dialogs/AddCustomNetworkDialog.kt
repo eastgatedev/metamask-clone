@@ -19,7 +19,6 @@ class AddCustomNetworkDialog(
     private val networkManager: NetworkManager,
     private val existingNetwork: Network? = null
 ) : DialogWrapper(project) {
-
     private val nameField = JBTextField()
     private val rpcUrlField = JBTextField()
     private val chainIdField = JBTextField()

@@ -25,7 +25,6 @@ import java.util.concurrent.ConcurrentHashMap
  * Provides balance fetching, gas price queries, and transaction sending.
  */
 class BlockchainService private constructor(private val project: Project) {
-
     private val web3jInstances = ConcurrentHashMap<String, Web3j>()
 
     companion object {
@@ -64,63 +63,72 @@ class BlockchainService private constructor(private val project: Project) {
     /**
      * Fetch native coin balance for an address.
      */
-    suspend fun getBalance(address: String, network: Network): BalanceResult = withContext(Dispatchers.IO) {
-        try {
-            val web3j = getWeb3j(network)
-            val balanceResponse = web3j.ethGetBalance(address, DefaultBlockParameterName.LATEST).send()
+    suspend fun getBalance(
+        address: String,
+        network: Network
+    ): BalanceResult =
+        withContext(Dispatchers.IO) {
+            try {
+                val web3j = getWeb3j(network)
+                val balanceResponse = web3j.ethGetBalance(address, DefaultBlockParameterName.LATEST).send()
 
-            if (balanceResponse.hasError()) {
-                return@withContext BalanceResult.Error(balanceResponse.error.message ?: "Unknown error")
+                if (balanceResponse.hasError()) {
+                    return@withContext BalanceResult.Error(balanceResponse.error.message ?: "Unknown error")
+                }
+
+                val balanceWei = balanceResponse.balance
+                val balanceEther = Convert.fromWei(BigDecimal(balanceWei), Convert.Unit.ETHER)
+
+                BalanceResult.Success(
+                    balanceWei = balanceWei,
+                    balanceFormatted = balanceEther.stripTrailingZeros().toPlainString(),
+                    symbol = network.symbol
+                )
+            } catch (e: Exception) {
+                BalanceResult.Error(e.message ?: "Failed to fetch balance")
             }
-
-            val balanceWei = balanceResponse.balance
-            val balanceEther = Convert.fromWei(BigDecimal(balanceWei), Convert.Unit.ETHER)
-
-            BalanceResult.Success(
-                balanceWei = balanceWei,
-                balanceFormatted = balanceEther.stripTrailingZeros().toPlainString(),
-                symbol = network.symbol
-            )
-        } catch (e: Exception) {
-            BalanceResult.Error(e.message ?: "Failed to fetch balance")
         }
-    }
 
     /**
      * Get current gas price from network.
      */
-    suspend fun getGasPrice(network: Network): GasPriceResult = withContext(Dispatchers.IO) {
-        try {
-            val web3j = getWeb3j(network)
-            val gasPriceResponse = web3j.ethGasPrice().send()
+    suspend fun getGasPrice(network: Network): GasPriceResult =
+        withContext(Dispatchers.IO) {
+            try {
+                val web3j = getWeb3j(network)
+                val gasPriceResponse = web3j.ethGasPrice().send()
 
-            if (gasPriceResponse.hasError()) {
-                return@withContext GasPriceResult.Error(gasPriceResponse.error.message ?: "Unknown error")
+                if (gasPriceResponse.hasError()) {
+                    return@withContext GasPriceResult.Error(gasPriceResponse.error.message ?: "Unknown error")
+                }
+
+                GasPriceResult.Success(gasPriceResponse.gasPrice)
+            } catch (e: Exception) {
+                GasPriceResult.Error(e.message ?: "Failed to fetch gas price")
             }
-
-            GasPriceResult.Success(gasPriceResponse.gasPrice)
-        } catch (e: Exception) {
-            GasPriceResult.Error(e.message ?: "Failed to fetch gas price")
         }
-    }
 
     /**
      * Get transaction nonce for an address.
      */
-    suspend fun getNonce(address: String, network: Network): NonceResult = withContext(Dispatchers.IO) {
-        try {
-            val web3j = getWeb3j(network)
-            val nonceResponse = web3j.ethGetTransactionCount(address, DefaultBlockParameterName.PENDING).send()
+    suspend fun getNonce(
+        address: String,
+        network: Network
+    ): NonceResult =
+        withContext(Dispatchers.IO) {
+            try {
+                val web3j = getWeb3j(network)
+                val nonceResponse = web3j.ethGetTransactionCount(address, DefaultBlockParameterName.PENDING).send()
 
-            if (nonceResponse.hasError()) {
-                return@withContext NonceResult.Error(nonceResponse.error.message ?: "Unknown error")
+                if (nonceResponse.hasError()) {
+                    return@withContext NonceResult.Error(nonceResponse.error.message ?: "Unknown error")
+                }
+
+                NonceResult.Success(nonceResponse.transactionCount)
+            } catch (e: Exception) {
+                NonceResult.Error(e.message ?: "Failed to fetch nonce")
             }
-
-            NonceResult.Success(nonceResponse.transactionCount)
-        } catch (e: Exception) {
-            NonceResult.Error(e.message ?: "Failed to fetch nonce")
         }
-    }
 
     /**
      * Send native coin (ETH, BNB, MATIC, etc.) to an address.
@@ -141,78 +149,79 @@ class BlockchainService private constructor(private val project: Project) {
         network: Network,
         gasLimit: BigInteger = BigInteger.valueOf(DEFAULT_GAS_LIMIT),
         gasPrice: BigInteger? = null
-    ): TransactionResult = withContext(Dispatchers.IO) {
-        try {
-            // Validate addresses before processing
-            if (!isValidAddress(fromAddress)) {
-                return@withContext TransactionResult.Error("Invalid from address: $fromAddress")
-            }
-            if (!isValidAddress(toAddress)) {
-                return@withContext TransactionResult.Error("Invalid to address: $toAddress")
-            }
-
-            val web3j = getWeb3j(network)
-            val credentials = Credentials.create(privateKey)
-
-            // Verify the credentials match the from address
-            if (!credentials.address.equals(fromAddress, ignoreCase = true)) {
-                return@withContext TransactionResult.Error("Private key does not match sender address")
-            }
-
-            // Get nonce
-            val nonceResponse = web3j.ethGetTransactionCount(fromAddress, DefaultBlockParameterName.PENDING).send()
-            if (nonceResponse.hasError()) {
-                return@withContext TransactionResult.Error("Failed to get nonce: ${nonceResponse.error.message}")
-            }
-            val nonce = nonceResponse.transactionCount
-
-            // Get gas price if not provided
-            val actualGasPrice = gasPrice ?: run {
-                val gasPriceResponse = web3j.ethGasPrice().send()
-                if (gasPriceResponse.hasError()) {
-                    return@withContext TransactionResult.Error("Failed to get gas price: ${gasPriceResponse.error.message}")
+    ): TransactionResult =
+        withContext(Dispatchers.IO) {
+            try {
+                // Validate addresses before processing
+                if (!isValidAddress(fromAddress)) {
+                    return@withContext TransactionResult.Error("Invalid from address: $fromAddress")
                 }
-                gasPriceResponse.gasPrice
+                if (!isValidAddress(toAddress)) {
+                    return@withContext TransactionResult.Error("Invalid to address: $toAddress")
+                }
+
+                val web3j = getWeb3j(network)
+                val credentials = Credentials.create(privateKey)
+
+                // Verify the credentials match the from address
+                if (!credentials.address.equals(fromAddress, ignoreCase = true)) {
+                    return@withContext TransactionResult.Error("Private key does not match sender address")
+                }
+
+                // Get nonce
+                val nonceResponse = web3j.ethGetTransactionCount(fromAddress, DefaultBlockParameterName.PENDING).send()
+                if (nonceResponse.hasError()) {
+                    return@withContext TransactionResult.Error("Failed to get nonce: ${nonceResponse.error.message}")
+                }
+                val nonce = nonceResponse.transactionCount
+
+                // Get gas price if not provided
+                val actualGasPrice = gasPrice ?: run {
+                    val gasPriceResponse = web3j.ethGasPrice().send()
+                    if (gasPriceResponse.hasError()) {
+                        return@withContext TransactionResult.Error("Failed to get gas price: ${gasPriceResponse.error.message}")
+                    }
+                    gasPriceResponse.gasPrice
+                }
+
+                // Convert amount to Wei
+                val amountWei = Convert.toWei(amount, Convert.Unit.ETHER).toBigInteger()
+
+                // Create raw transaction
+                val rawTransaction = RawTransaction.createEtherTransaction(
+                    nonce,
+                    actualGasPrice,
+                    gasLimit,
+                    toAddress,
+                    amountWei
+                )
+
+                // Sign transaction with chain ID (EIP-155)
+                val signedMessage = TransactionEncoder.signMessage(
+                    rawTransaction,
+                    network.chainId.toLong(),
+                    credentials
+                )
+                val hexValue = Numeric.toHexString(signedMessage)
+
+                // Send transaction
+                val transactionResponse = web3j.ethSendRawTransaction(hexValue).send()
+
+                if (transactionResponse.hasError()) {
+                    return@withContext TransactionResult.Error(transactionResponse.error.message ?: "Transaction failed")
+                }
+
+                val txHash = transactionResponse.transactionHash
+                val explorerUrl = network.blockExplorerUrl?.let { "$it/tx/$txHash" }
+
+                TransactionResult.Success(
+                    transactionHash = txHash,
+                    explorerUrl = explorerUrl
+                )
+            } catch (e: Exception) {
+                TransactionResult.Error(e.message ?: "Transaction failed")
             }
-
-            // Convert amount to Wei
-            val amountWei = Convert.toWei(amount, Convert.Unit.ETHER).toBigInteger()
-
-            // Create raw transaction
-            val rawTransaction = RawTransaction.createEtherTransaction(
-                nonce,
-                actualGasPrice,
-                gasLimit,
-                toAddress,
-                amountWei
-            )
-
-            // Sign transaction with chain ID (EIP-155)
-            val signedMessage = TransactionEncoder.signMessage(
-                rawTransaction,
-                network.chainId.toLong(),
-                credentials
-            )
-            val hexValue = Numeric.toHexString(signedMessage)
-
-            // Send transaction
-            val transactionResponse = web3j.ethSendRawTransaction(hexValue).send()
-
-            if (transactionResponse.hasError()) {
-                return@withContext TransactionResult.Error(transactionResponse.error.message ?: "Transaction failed")
-            }
-
-            val txHash = transactionResponse.transactionHash
-            val explorerUrl = network.blockExplorerUrl?.let { "$it/tx/$txHash" }
-
-            TransactionResult.Success(
-                transactionHash = txHash,
-                explorerUrl = explorerUrl
-            )
-        } catch (e: Exception) {
-            TransactionResult.Error(e.message ?: "Transaction failed")
         }
-    }
 
     /**
      * Wait for transaction confirmation by polling for receipt.
@@ -227,33 +236,34 @@ class BlockchainService private constructor(private val project: Project) {
         network: Network,
         maxWaitSeconds: Int = DEFAULT_TIMEOUT_SECONDS,
         pollIntervalMs: Long = DEFAULT_POLL_INTERVAL_MS
-    ): ConfirmationResult = withContext(Dispatchers.IO) {
-        try {
-            val web3j = getWeb3j(network)
-            val maxAttempts = (maxWaitSeconds * 1000 / pollIntervalMs).toInt()
+    ): ConfirmationResult =
+        withContext(Dispatchers.IO) {
+            try {
+                val web3j = getWeb3j(network)
+                val maxAttempts = (maxWaitSeconds * 1000 / pollIntervalMs).toInt()
 
-            repeat(maxAttempts) {
-                val receiptResponse = web3j.ethGetTransactionReceipt(txHash).send()
+                repeat(maxAttempts) {
+                    val receiptResponse = web3j.ethGetTransactionReceipt(txHash).send()
 
-                if (receiptResponse.transactionReceipt.isPresent) {
-                    val receipt = receiptResponse.transactionReceipt.get()
-                    val success = receipt.status == "0x1"
+                    if (receiptResponse.transactionReceipt.isPresent) {
+                        val receipt = receiptResponse.transactionReceipt.get()
+                        val success = receipt.status == "0x1"
 
-                    return@withContext ConfirmationResult.Confirmed(
-                        blockNumber = receipt.blockNumber,
-                        gasUsed = receipt.gasUsed,
-                        success = success
-                    )
+                        return@withContext ConfirmationResult.Confirmed(
+                            blockNumber = receipt.blockNumber,
+                            gasUsed = receipt.gasUsed,
+                            success = success
+                        )
+                    }
+
+                    delay(pollIntervalMs)
                 }
 
-                delay(pollIntervalMs)
+                ConfirmationResult.Timeout
+            } catch (e: Exception) {
+                ConfirmationResult.Error(e.message ?: "Failed to get confirmation")
             }
-
-            ConfirmationResult.Timeout
-        } catch (e: Exception) {
-            ConfirmationResult.Error(e.message ?: "Failed to get confirmation")
         }
-    }
 
     // ==================== ERC20 Token Methods ====================
 
@@ -266,30 +276,31 @@ class BlockchainService private constructor(private val project: Project) {
     suspend fun getTokenMetadata(
         contractAddress: String,
         network: Network
-    ): TokenMetadataResult = withContext(Dispatchers.IO) {
-        try {
-            if (!isValidAddress(contractAddress)) {
-                return@withContext TokenMetadataResult.Error("Invalid contract address: $contractAddress")
+    ): TokenMetadataResult =
+        withContext(Dispatchers.IO) {
+            try {
+                if (!isValidAddress(contractAddress)) {
+                    return@withContext TokenMetadataResult.Error("Invalid contract address: $contractAddress")
+                }
+
+                val web3j = getWeb3j(network)
+                // Use a dummy credentials for read-only operations
+                val dummyCredentials = Credentials.create("0x0000000000000000000000000000000000000000000000000000000000000001")
+                val erc20 = ERC20.load(contractAddress, web3j, dummyCredentials, DefaultGasProvider())
+
+                val symbol = erc20.symbol().send()
+                val name = erc20.name().send()
+                val decimals = erc20.decimals().send().toInt()
+
+                TokenMetadataResult.Success(
+                    symbol = symbol,
+                    name = name,
+                    decimals = decimals
+                )
+            } catch (e: Exception) {
+                TokenMetadataResult.Error(e.message ?: "Failed to fetch token metadata")
             }
-
-            val web3j = getWeb3j(network)
-            // Use a dummy credentials for read-only operations
-            val dummyCredentials = Credentials.create("0x0000000000000000000000000000000000000000000000000000000000000001")
-            val erc20 = ERC20.load(contractAddress, web3j, dummyCredentials, DefaultGasProvider())
-
-            val symbol = erc20.symbol().send()
-            val name = erc20.name().send()
-            val decimals = erc20.decimals().send().toInt()
-
-            TokenMetadataResult.Success(
-                symbol = symbol,
-                name = name,
-                decimals = decimals
-            )
-        } catch (e: Exception) {
-            TokenMetadataResult.Error(e.message ?: "Failed to fetch token metadata")
         }
-    }
 
     /**
      * Fetch ERC20 token balance for an address.
@@ -304,37 +315,38 @@ class BlockchainService private constructor(private val project: Project) {
         walletAddress: String,
         decimals: Int,
         network: Network
-    ): TokenBalanceResult = withContext(Dispatchers.IO) {
-        try {
-            if (!isValidAddress(contractAddress)) {
-                return@withContext TokenBalanceResult.Error("Invalid contract address: $contractAddress")
+    ): TokenBalanceResult =
+        withContext(Dispatchers.IO) {
+            try {
+                if (!isValidAddress(contractAddress)) {
+                    return@withContext TokenBalanceResult.Error("Invalid contract address: $contractAddress")
+                }
+                if (!isValidAddress(walletAddress)) {
+                    return@withContext TokenBalanceResult.Error("Invalid wallet address: $walletAddress")
+                }
+
+                val web3j = getWeb3j(network)
+                // Use a dummy credentials for read-only operations
+                val dummyCredentials = Credentials.create("0x0000000000000000000000000000000000000000000000000000000000000001")
+                val erc20 = ERC20.load(contractAddress, web3j, dummyCredentials, DefaultGasProvider())
+
+                val balanceRaw = erc20.balanceOf(walletAddress).send()
+
+                // Format balance with decimals
+                val divisor = BigInteger.TEN.pow(decimals)
+                val balanceFormatted = BigDecimal(balanceRaw)
+                    .divide(BigDecimal(divisor))
+                    .stripTrailingZeros()
+                    .toPlainString()
+
+                TokenBalanceResult.Success(
+                    balanceRaw = balanceRaw,
+                    balanceFormatted = balanceFormatted
+                )
+            } catch (e: Exception) {
+                TokenBalanceResult.Error(e.message ?: "Failed to fetch token balance")
             }
-            if (!isValidAddress(walletAddress)) {
-                return@withContext TokenBalanceResult.Error("Invalid wallet address: $walletAddress")
-            }
-
-            val web3j = getWeb3j(network)
-            // Use a dummy credentials for read-only operations
-            val dummyCredentials = Credentials.create("0x0000000000000000000000000000000000000000000000000000000000000001")
-            val erc20 = ERC20.load(contractAddress, web3j, dummyCredentials, DefaultGasProvider())
-
-            val balanceRaw = erc20.balanceOf(walletAddress).send()
-
-            // Format balance with decimals
-            val divisor = BigInteger.TEN.pow(decimals)
-            val balanceFormatted = BigDecimal(balanceRaw)
-                .divide(BigDecimal(divisor))
-                .stripTrailingZeros()
-                .toPlainString()
-
-            TokenBalanceResult.Success(
-                balanceRaw = balanceRaw,
-                balanceFormatted = balanceFormatted
-            )
-        } catch (e: Exception) {
-            TokenBalanceResult.Error(e.message ?: "Failed to fetch token balance")
         }
-    }
 
     /**
      * Send ERC20 tokens to an address.
@@ -357,53 +369,54 @@ class BlockchainService private constructor(private val project: Project) {
         network: Network,
         gasLimit: BigInteger = BigInteger.valueOf(ERC20_GAS_LIMIT),
         gasPrice: BigInteger? = null
-    ): TokenTransferResult = withContext(Dispatchers.IO) {
-        try {
-            if (!isValidAddress(contractAddress)) {
-                return@withContext TokenTransferResult.Error("Invalid contract address: $contractAddress")
-            }
-            if (!isValidAddress(toAddress)) {
-                return@withContext TokenTransferResult.Error("Invalid recipient address: $toAddress")
-            }
-
-            val web3j = getWeb3j(network)
-            val credentials = Credentials.create(privateKey)
-
-            // Get gas price if not provided
-            val actualGasPrice = gasPrice ?: run {
-                val gasPriceResponse = web3j.ethGasPrice().send()
-                if (gasPriceResponse.hasError()) {
-                    return@withContext TokenTransferResult.Error("Failed to get gas price: ${gasPriceResponse.error.message}")
+    ): TokenTransferResult =
+        withContext(Dispatchers.IO) {
+            try {
+                if (!isValidAddress(contractAddress)) {
+                    return@withContext TokenTransferResult.Error("Invalid contract address: $contractAddress")
                 }
-                gasPriceResponse.gasPrice
+                if (!isValidAddress(toAddress)) {
+                    return@withContext TokenTransferResult.Error("Invalid recipient address: $toAddress")
+                }
+
+                val web3j = getWeb3j(network)
+                val credentials = Credentials.create(privateKey)
+
+                // Get gas price if not provided
+                val actualGasPrice = gasPrice ?: run {
+                    val gasPriceResponse = web3j.ethGasPrice().send()
+                    if (gasPriceResponse.hasError()) {
+                        return@withContext TokenTransferResult.Error("Failed to get gas price: ${gasPriceResponse.error.message}")
+                    }
+                    gasPriceResponse.gasPrice
+                }
+
+                // Create gas provider with specified gas price and limit
+                val gasProvider = StaticGasProvider(actualGasPrice, gasLimit)
+                val erc20 = ERC20.load(contractAddress, web3j, credentials, gasProvider)
+
+                // Convert amount to smallest unit (multiply by 10^decimals)
+                val multiplier = BigInteger.TEN.pow(decimals)
+                val amountInSmallestUnit = amount.multiply(BigDecimal(multiplier)).toBigInteger()
+
+                // Execute the transfer
+                val receipt = erc20.transfer(toAddress, amountInSmallestUnit).send()
+
+                if (receipt.status != "0x1") {
+                    return@withContext TokenTransferResult.Error("Transaction failed on chain")
+                }
+
+                val txHash = receipt.transactionHash
+                val explorerUrl = network.blockExplorerUrl?.let { "$it/tx/$txHash" }
+
+                TokenTransferResult.Success(
+                    transactionHash = txHash,
+                    explorerUrl = explorerUrl
+                )
+            } catch (e: Exception) {
+                TokenTransferResult.Error(e.message ?: "Token transfer failed")
             }
-
-            // Create gas provider with specified gas price and limit
-            val gasProvider = StaticGasProvider(actualGasPrice, gasLimit)
-            val erc20 = ERC20.load(contractAddress, web3j, credentials, gasProvider)
-
-            // Convert amount to smallest unit (multiply by 10^decimals)
-            val multiplier = BigInteger.TEN.pow(decimals)
-            val amountInSmallestUnit = amount.multiply(BigDecimal(multiplier)).toBigInteger()
-
-            // Execute the transfer
-            val receipt = erc20.transfer(toAddress, amountInSmallestUnit).send()
-
-            if (receipt.status != "0x1") {
-                return@withContext TokenTransferResult.Error("Transaction failed on chain")
-            }
-
-            val txHash = receipt.transactionHash
-            val explorerUrl = network.blockExplorerUrl?.let { "$it/tx/$txHash" }
-
-            TokenTransferResult.Success(
-                transactionHash = txHash,
-                explorerUrl = explorerUrl
-            )
-        } catch (e: Exception) {
-            TokenTransferResult.Error(e.message ?: "Token transfer failed")
         }
-    }
 
     /**
      * Invalidate cached Web3j instance for a network.

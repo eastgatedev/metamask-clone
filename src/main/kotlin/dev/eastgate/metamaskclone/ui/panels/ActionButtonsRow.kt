@@ -15,7 +15,6 @@ import javax.swing.JPanel
 import javax.swing.SwingConstants
 
 class ActionButtonsRow : JPanel() {
-
     var onSendClick: (() -> Unit)? = null
     var onReceiveClick: (() -> Unit)? = null
 
@@ -47,7 +46,10 @@ class ActionButtonsRow : JPanel() {
         add(receiveButton)
     }
 
-    private fun createActionButton(icon: String, label: String): JPanel {
+    private fun createActionButton(
+        icon: String,
+        label: String
+    ): JPanel {
         val panel = JPanel(BorderLayout())
         panel.isOpaque = false
         panel.cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)

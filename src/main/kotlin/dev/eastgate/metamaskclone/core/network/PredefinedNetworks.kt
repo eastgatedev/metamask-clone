@@ -3,7 +3,6 @@ package dev.eastgate.metamaskclone.core.network
 import dev.eastgate.metamaskclone.core.storage.Network
 
 object PredefinedNetworks {
-    
     val ETHEREUM_MAINNET = Network(
         id = "ETH_MAINNET",
         name = "Ethereum Mainnet",
@@ -14,7 +13,7 @@ object PredefinedNetworks {
         isTestnet = false,
         isCustom = false
     )
-    
+
     val ETHEREUM_SEPOLIA = Network(
         id = "ETH_SEPOLIA",
         name = "Ethereum Sepolia",
@@ -25,7 +24,7 @@ object PredefinedNetworks {
         isTestnet = true,
         isCustom = false
     )
-    
+
     val BNB_MAINNET = Network(
         id = "BNB_MAINNET",
         name = "BNB Smart Chain",
@@ -36,7 +35,7 @@ object PredefinedNetworks {
         isTestnet = false,
         isCustom = false
     )
-    
+
     val BNB_TESTNET = Network(
         id = "BNB_TESTNET",
         name = "BNB Testnet",
@@ -47,7 +46,7 @@ object PredefinedNetworks {
         isTestnet = true,
         isCustom = false
     )
-    
+
     val POLYGON_MAINNET = Network(
         id = "POLYGON_MAINNET",
         name = "Polygon",
@@ -58,7 +57,7 @@ object PredefinedNetworks {
         isTestnet = false,
         isCustom = false
     )
-    
+
     val POLYGON_TESTNET = Network(
         id = "POLYGON_TESTNET",
         name = "Polygon Mumbai",
@@ -69,16 +68,16 @@ object PredefinedNetworks {
         isTestnet = true,
         isCustom = false
     )
-    
+
     val ALL_NETWORKS = listOf(
-        BNB_TESTNET,  // Default first
+        BNB_TESTNET, // Default first
         BNB_MAINNET,
         ETHEREUM_SEPOLIA,
         ETHEREUM_MAINNET,
         POLYGON_TESTNET,
         POLYGON_MAINNET
     )
-    
+
     val TESTNET_NETWORKS = ALL_NETWORKS.filter { it.isTestnet }
     val MAINNET_NETWORKS = ALL_NETWORKS.filter { !it.isTestnet }
 
@@ -96,7 +95,10 @@ object PredefinedNetworks {
         return ALL_NETWORKS.filter { it.id in DEFAULT_ENABLED_IDS }
     }
 
-    fun isNetworkEnabled(id: String, enabledIds: List<String>): Boolean {
+    fun isNetworkEnabled(
+        id: String,
+        enabledIds: List<String>
+    ): Boolean {
         return id in enabledIds
     }
 }

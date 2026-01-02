@@ -21,7 +21,6 @@ import java.awt.Font
 import javax.swing.*
 
 class MetaMaskToolWindow(private val project: Project) {
-
     private val walletManager = WalletManager.getInstance(project)
     private val networkManager = NetworkManager.getInstance(project)
     private val blockchainService = BlockchainService.getInstance(project)
@@ -410,7 +409,7 @@ class MetaMaskToolWindow(private val project: Project) {
                 // Check for duplicates
                 val existingIndex = tokens.indexOfFirst {
                     it.contractAddress.equals(token.contractAddress, ignoreCase = true) &&
-                    it.networkId == token.networkId
+                        it.networkId == token.networkId
                 }
 
                 if (existingIndex >= 0) {

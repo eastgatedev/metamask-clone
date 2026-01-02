@@ -1,17 +1,8 @@
 package dev.eastgate.metamaskclone
 
-import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Disabled
-import org.web3j.protocol.Web3j
-import org.web3j.protocol.http.HttpService
-import org.web3j.protocol.core.DefaultBlockParameterName
-import org.web3j.utils.Convert
-import org.web3j.crypto.Credentials
-import org.web3j.crypto.RawTransaction
-import org.web3j.crypto.TransactionEncoder
-import org.web3j.tx.Transfer
-import org.web3j.utils.Numeric
+import org.junit.jupiter.api.Test
 import org.web3j.abi.FunctionEncoder
 import org.web3j.abi.FunctionReturnDecoder
 import org.web3j.abi.TypeReference
@@ -19,15 +10,23 @@ import org.web3j.abi.datatypes.Address
 import org.web3j.abi.datatypes.Function
 import org.web3j.abi.datatypes.generated.Uint256
 import org.web3j.contracts.eip20.generated.ERC20
+import org.web3j.crypto.Credentials
+import org.web3j.crypto.RawTransaction
+import org.web3j.crypto.TransactionEncoder
+import org.web3j.protocol.Web3j
+import org.web3j.protocol.core.DefaultBlockParameterName
 import org.web3j.protocol.core.methods.request.Transaction
+import org.web3j.protocol.http.HttpService
+import org.web3j.tx.Transfer
 import org.web3j.tx.gas.DefaultGasProvider
 import org.web3j.tx.gas.StaticGasProvider
+import org.web3j.utils.Convert
+import org.web3j.utils.Numeric
 import java.math.BigDecimal
 import java.math.BigInteger
 
 @Disabled
 class TestWeb3j {
-
     companion object {
         // BNB Testnet (BSC Testnet) configuration
         const val BNB_TESTNET_RPC_URL = "https://data-seed-prebsc-1-s1.binance.org:8545/"
@@ -74,7 +73,6 @@ class TestWeb3j {
             // Assert that we got a valid balance (non-null)
             assertNotNull(balanceInWei, "Balance should not be null")
             assertTrue(balanceInWei >= java.math.BigInteger.ZERO, "Balance should be non-negative")
-
         } finally {
             web3j.shutdown()
         }
@@ -237,7 +235,6 @@ class TestWeb3j {
                 balanceAfter.compareTo(balanceBefore) < 0,
                 "Balance should decrease after transfer. Before: $balanceBefore, After: $balanceAfter"
             )
-
         } finally {
             web3j.shutdown()
         }
@@ -275,8 +272,8 @@ class TestWeb3j {
             // ERC20 balanceOf(address) returns uint256
             val function = Function(
                 "balanceOf",
-                listOf(Address(walletAddress)),  // Input parameters
-                listOf(object : TypeReference<Uint256>() {})  // Output parameters
+                listOf(Address(walletAddress)), // Input parameters
+                listOf(object : TypeReference<Uint256>() {}) // Output parameters
             )
 
             // Encode the function call
@@ -322,7 +319,6 @@ class TestWeb3j {
                 balanceInSmallestUnit >= BigInteger.ZERO,
                 "Token balance should be non-negative"
             )
-
         } finally {
             web3j.shutdown()
         }
@@ -396,7 +392,6 @@ class TestWeb3j {
                 senderBalanceAfter == balanceBefore.subtract(amountToSend),
                 "Sender balance should decrease by exactly 50 EGT"
             )
-
         } finally {
             web3j.shutdown()
         }
@@ -447,9 +442,9 @@ class TestWeb3j {
                 nonce,
                 gasPrice,
                 gasLimit,
-                EGT_TOKEN_ADDRESS,  // Contract address
-                BigInteger.ZERO,     // No ETH/BNB value
-                encodedFunction      // Encoded function call data
+                EGT_TOKEN_ADDRESS, // Contract address
+                BigInteger.ZERO, // No ETH/BNB value
+                encodedFunction // Encoded function call data
             )
 
             // Sign the transaction with chain ID (EIP-155)
@@ -528,7 +523,6 @@ class TestWeb3j {
             println("Balance difference: ${BigDecimal(balanceDiff).divide(BigDecimal(divisor))} $EGT_TOKEN_SYMBOL")
 
             assertEquals(amountToSend, balanceDiff, "Balance should decrease by exactly 10 EGT")
-
         } finally {
             web3j.shutdown()
         }

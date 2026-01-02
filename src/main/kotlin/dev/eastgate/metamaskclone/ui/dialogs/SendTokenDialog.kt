@@ -35,7 +35,6 @@ class SendTokenDialog(
     private val token: Token? = null,
     private val availableTokens: List<Token> = emptyList()
 ) : DialogWrapper(project) {
-
     private val toAddressField = JBTextField()
     private val amountField = JBTextField()
     private val tokenSelector = JComboBox<String>()
@@ -57,7 +56,7 @@ class SendTokenDialog(
 
     init {
         title = "Send ${network.symbol}"
-        isOKActionEnabled = false  // Disable until data is loaded
+        isOKActionEnabled = false // Disable until data is loaded
         init()
         setupTokenSelector()
         fetchGasPrice()
@@ -455,7 +454,9 @@ class SendTokenDialog(
         val isNativeToken = tokenSelector.selectedIndex == 0
         val selectedToken = if (!isNativeToken && tokenSelector.selectedIndex - 1 < availableTokens.size) {
             availableTokens[tokenSelector.selectedIndex - 1]
-        } else null
+        } else {
+            null
+        }
 
         scope.launch {
             // Always need native token for gas

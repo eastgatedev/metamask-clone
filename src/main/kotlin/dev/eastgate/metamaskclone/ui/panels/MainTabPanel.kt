@@ -16,7 +16,6 @@ import javax.swing.JPanel
 import javax.swing.SwingConstants
 
 class MainTabPanel : JPanel() {
-
     var onAddTokenClick: (() -> Unit)? = null
     var onTokenSelected: ((Token) -> Unit)? = null
     var onDeleteToken: ((Token) -> Unit)? = null
@@ -59,7 +58,10 @@ class MainTabPanel : JPanel() {
         selectTab("Tokens")
     }
 
-    private fun createTabLabel(text: String, selected: Boolean): JPanel {
+    private fun createTabLabel(
+        text: String,
+        selected: Boolean
+    ): JPanel {
         val panel = JPanel(BorderLayout())
         panel.isOpaque = false
         panel.cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
@@ -109,7 +111,10 @@ class MainTabPanel : JPanel() {
         cardLayout.show(contentPanel, tabName)
     }
 
-    private fun updateTabStyle(tabPanel: JPanel, selected: Boolean) {
+    private fun updateTabStyle(
+        tabPanel: JPanel,
+        selected: Boolean
+    ) {
         val label = tabPanel.getComponent(0) as JBLabel
         val underline = tabPanel.getComponent(1) as JPanel
 
