@@ -5,6 +5,7 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
 import com.intellij.openapi.project.Project
+import dev.eastgate.metamaskclone.models.BlockchainType
 import dev.eastgate.metamaskclone.models.Token
 import dev.eastgate.metamaskclone.models.Wallet
 import kotlinx.serialization.decodeFromString
@@ -139,5 +140,6 @@ data class Network(
     val symbol: String,
     val blockExplorerUrl: String? = null,
     val isTestnet: Boolean = false,
-    val isCustom: Boolean = false
+    val isCustom: Boolean = false,
+    val blockchainType: BlockchainType = BlockchainType.EVM
 )

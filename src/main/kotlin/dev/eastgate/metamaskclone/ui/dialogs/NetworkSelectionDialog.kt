@@ -257,6 +257,7 @@ class NetworkSelectionDialog(
             network.symbol.equals("BNB", ignoreCase = true) ||
                 network.symbol.equals("tBNB", ignoreCase = true) -> "B"
             network.symbol.equals("MATIC", ignoreCase = true) -> "P"
+            network.symbol.equals("TRX", ignoreCase = true) -> "T"
             else -> network.symbol.firstOrNull()?.uppercase() ?: "?"
         }
     }

@@ -12,7 +12,8 @@ data class Wallet(
     val createdAt: String = LocalDateTime.now().toString(),
     val isImported: Boolean = false,
     val derivationPath: String? = null,
-    val mnemonicId: String? = null
+    val mnemonicId: String? = null,
+    val blockchainType: BlockchainType = BlockchainType.EVM
 ) {
     fun getShortAddress(): String {
         return if (address.length > 10) {
@@ -23,7 +24,10 @@ data class Wallet(
     }
 
     fun isValid(): Boolean {
-        return address.startsWith("0x") && address.length == 42
+        return when (blockchainType) {
+            BlockchainType.EVM -> address.startsWith("0x") && address.length == 42
+            BlockchainType.TRON -> address.startsWith("T") && address.length == 34
+        }
     }
 }
 

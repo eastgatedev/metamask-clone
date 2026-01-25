@@ -2,6 +2,7 @@ package dev.eastgate.metamaskclone.core.wallet
 
 import com.intellij.openapi.project.Project
 import dev.eastgate.metamaskclone.core.storage.ProjectStorage
+import dev.eastgate.metamaskclone.models.BlockchainType
 import dev.eastgate.metamaskclone.models.Wallet
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -9,6 +10,7 @@ import kotlinx.coroutines.flow.asStateFlow
 
 class WalletManager(private val project: Project) {
     private val walletGenerator = WalletGenerator()
+    private val tronWalletGenerator = TronWalletGenerator()
     private val storage = ProjectStorage.getInstance(project)
 
     private val _wallets = MutableStateFlow<List<Wallet>>(emptyList())
@@ -28,18 +30,52 @@ class WalletManager(private val project: Project) {
         }
     }
 
+    /**
+     * Get wallets filtered by blockchain type.
+     */
+    fun getWalletsForBlockchainType(blockchainType: BlockchainType): List<Wallet> {
+        return _wallets.value.filter { it.blockchainType == blockchainType }
+    }
+
+    /**
+     * Count wallets by blockchain type (for naming new wallets).
+     */
+    fun getWalletCountForType(blockchainType: BlockchainType): Int {
+        return _wallets.value.count { it.blockchainType == blockchainType }
+    }
+
+    /**
+     * Select the first wallet for a given blockchain type.
+     */
+    fun selectFirstWalletForType(blockchainType: BlockchainType) {
+        val walletsOfType = getWalletsForBlockchainType(blockchainType)
+        _selectedWallet.value = walletsOfType.firstOrNull()
+    }
+
     fun createWallet(
         name: String? = null,
-        password: String
+        password: String,
+        blockchainType: BlockchainType = BlockchainType.EVM
     ): Wallet {
-        val walletName = name ?: walletGenerator.generateWalletName(_wallets.value.size)
-        val wallet = walletGenerator.generateNewWallet(walletName, password)
+        val walletCount = getWalletCountForType(blockchainType)
+        val walletName = name ?: when (blockchainType) {
+            BlockchainType.EVM -> walletGenerator.generateWalletName(walletCount)
+            BlockchainType.TRON -> tronWalletGenerator.generateWalletName(walletCount)
+        }
+
+        val wallet = when (blockchainType) {
+            BlockchainType.EVM -> walletGenerator.generateNewWallet(walletName, password)
+            BlockchainType.TRON -> tronWalletGenerator.generateNewWallet(walletName, password)
+        }
 
         val updatedWallets = _wallets.value + wallet
         _wallets.value = updatedWallets
         storage.saveWallets(updatedWallets)
 
-        if (_selectedWallet.value == null) {
+        // Auto-select if no wallet selected or if it matches the blockchain type
+        if (_selectedWallet.value == null ||
+            _selectedWallet.value?.blockchainType == blockchainType
+        ) {
             _selectedWallet.value = wallet
         }
 
@@ -49,22 +85,36 @@ class WalletManager(private val project: Project) {
     fun importWallet(
         privateKey: String,
         name: String? = null,
-        password: String
+        password: String,
+        blockchainType: BlockchainType = BlockchainType.EVM
     ): Wallet {
-        val walletName = name ?: walletGenerator.generateWalletName(_wallets.value.size)
+        val walletName = name ?: when (blockchainType) {
+            BlockchainType.EVM -> "Imported Wallet"
+            BlockchainType.TRON -> "Imported TRON Wallet"
+        }
 
-        // Check if wallet already exists
-        val existingWallet = walletGenerator.importWalletFromPrivateKey(privateKey, walletName, password)
-        if (_wallets.value.any { it.address.equals(existingWallet.address, ignoreCase = true) }) {
+        val wallet = when (blockchainType) {
+            BlockchainType.EVM -> walletGenerator.importWalletFromPrivateKey(privateKey, walletName, password)
+            BlockchainType.TRON -> tronWalletGenerator.importWalletFromPrivateKey(privateKey, walletName, password)
+        }
+
+        // Check if wallet already exists (same address AND same blockchain type)
+        if (_wallets.value.any {
+                it.address.equals(wallet.address, ignoreCase = true) &&
+                    it.blockchainType == blockchainType
+            }
+        ) {
             throw IllegalArgumentException("Wallet with this address already exists")
         }
 
-        val wallet = existingWallet
         val updatedWallets = _wallets.value + wallet
         _wallets.value = updatedWallets
         storage.saveWallets(updatedWallets)
 
-        if (_selectedWallet.value == null) {
+        // Auto-select if no wallet selected or if it matches the blockchain type
+        if (_selectedWallet.value == null ||
+            _selectedWallet.value?.blockchainType == blockchainType
+        ) {
             _selectedWallet.value = wallet
         }
 
@@ -95,6 +145,10 @@ class WalletManager(private val project: Project) {
     }
 
     fun deleteWallet(address: String) {
+        val walletToDelete = _wallets.value.find {
+            it.address.equals(address, ignoreCase = true)
+        }
+
         val updatedWallets = _wallets.value.filter {
             !it.address.equals(address, ignoreCase = true)
         }
@@ -105,7 +159,13 @@ class WalletManager(private val project: Project) {
         // Update selected wallet if it was deleted
         _selectedWallet.value?.let { selected ->
             if (selected.address.equals(address, ignoreCase = true)) {
-                _selectedWallet.value = updatedWallets.firstOrNull()
+                // Select first wallet of the same blockchain type, or null if none
+                val blockchainType = walletToDelete?.blockchainType
+                _selectedWallet.value = if (blockchainType != null) {
+                    updatedWallets.firstOrNull { it.blockchainType == blockchainType }
+                } else {
+                    null
+                }
             }
         }
     }
@@ -124,7 +184,10 @@ class WalletManager(private val project: Project) {
             it.address.equals(address, ignoreCase = true)
         } ?: throw IllegalArgumentException("Wallet not found")
 
-        return walletGenerator.decryptPrivateKey(wallet.encryptedPrivateKey, password)
+        return when (wallet.blockchainType) {
+            BlockchainType.EVM -> walletGenerator.decryptPrivateKey(wallet.encryptedPrivateKey, password)
+            BlockchainType.TRON -> tronWalletGenerator.decryptPrivateKey(wallet.encryptedPrivateKey, password)
+        }
     }
 
     fun getWalletByAddress(address: String): Wallet? {

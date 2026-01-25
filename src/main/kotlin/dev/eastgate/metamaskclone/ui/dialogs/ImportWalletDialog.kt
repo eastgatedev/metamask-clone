@@ -7,6 +7,7 @@ import com.intellij.ui.components.JBPasswordField
 import com.intellij.ui.components.JBTextArea
 import com.intellij.ui.components.JBTextField
 import dev.eastgate.metamaskclone.core.wallet.WalletManager
+import dev.eastgate.metamaskclone.models.BlockchainType
 import java.awt.GridBagConstraints
 import java.awt.GridBagLayout
 import java.awt.Insets
@@ -14,7 +15,8 @@ import javax.swing.*
 
 class ImportWalletDialog(
     private val project: Project,
-    private val walletManager: WalletManager
+    private val walletManager: WalletManager,
+    private val blockchainType: BlockchainType = BlockchainType.EVM
 ) : DialogWrapper(project) {
     private val nameField = JBTextField()
     private val privateKeyArea = JBTextArea(3, 40)
@@ -22,7 +24,10 @@ class ImportWalletDialog(
     private val confirmPasswordField = JBPasswordField()
 
     init {
-        title = "Import Wallet"
+        title = when (blockchainType) {
+            BlockchainType.EVM -> "Import Wallet"
+            BlockchainType.TRON -> "Import TRON Wallet"
+        }
         init()
     }
 
@@ -39,7 +44,10 @@ class ImportWalletDialog(
 
         gbc.gridx = 1
         gbc.weightx = 1.0
-        nameField.text = "Imported Wallet"
+        nameField.text = when (blockchainType) {
+            BlockchainType.EVM -> "Imported Wallet"
+            BlockchainType.TRON -> "Imported TRON Wallet"
+        }
         panel.add(nameField, gbc)
 
         // Private Key
@@ -80,7 +88,11 @@ class ImportWalletDialog(
         gbc.gridx = 0
         gbc.gridy = 4
         gbc.gridwidth = 2
-        val noteLabel = JLabel("<html><small>⚠️ Never share your private key with anyone!</small></html>")
+        val noteText = when (blockchainType) {
+            BlockchainType.EVM -> "⚠️ Never share your private key with anyone!"
+            BlockchainType.TRON -> "⚠️ Never share your private key! TRON uses the same key format as EVM."
+        }
+        val noteLabel = JLabel("<html><small>$noteText</small></html>")
         panel.add(noteLabel, gbc)
 
         return panel
@@ -118,7 +130,7 @@ class ImportWalletDialog(
         }
 
         try {
-            val wallet = walletManager.importWallet(privateKey, name, password)
+            val wallet = walletManager.importWallet(privateKey, name, password, blockchainType)
             Messages.showInfoMessage(
                 "Wallet imported successfully!\nAddress: ${wallet.address}",
                 "Success"

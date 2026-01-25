@@ -7,6 +7,7 @@ import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBLabel
 import com.intellij.util.ui.JBUI
+import dev.eastgate.metamaskclone.models.BlockchainType
 import dev.eastgate.metamaskclone.models.Wallet
 import dev.eastgate.metamaskclone.utils.ClipboardUtil
 import java.awt.BorderLayout
@@ -33,7 +34,11 @@ class ReceiveDialog(
         panel.preferredSize = Dimension(350, 400)
 
         // Title
-        val titleLabel = JBLabel("Your Address")
+        val titleText = when (wallet.blockchainType) {
+            BlockchainType.EVM -> "Your Address"
+            BlockchainType.TRON -> "Your TRON Address"
+        }
+        val titleLabel = JBLabel(titleText)
         titleLabel.font = titleLabel.font.deriveFont(Font.BOLD, 16f)
         titleLabel.horizontalAlignment = SwingConstants.CENTER
         titleLabel.border = JBUI.Borders.emptyBottom(10)
@@ -69,8 +74,12 @@ class ReceiveDialog(
         buttonPanel.add(copyButton)
 
         // Warning
+        val warningText = when (wallet.blockchainType) {
+            BlockchainType.EVM -> "Only send tokens on the same EVM network.<br/>Sending to wrong network may result in loss."
+            BlockchainType.TRON -> "Only send TRX and TRC tokens to this address.<br/>Do not send EVM tokens to this address."
+        }
         val warningLabel =
-            JBLabel("<html><center><small>Only send tokens on the same network.<br/>Sending to wrong network may result in loss.</small></center></html>")
+            JBLabel("<html><center><small>$warningText</small></center></html>")
         warningLabel.horizontalAlignment = SwingConstants.CENTER
         warningLabel.foreground = JBColor(0xFF9800.toInt(), 0xFFB74D.toInt())
         warningLabel.border = JBUI.Borders.emptyTop(15)

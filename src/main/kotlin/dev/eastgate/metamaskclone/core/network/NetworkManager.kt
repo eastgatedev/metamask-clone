@@ -3,6 +3,7 @@ package dev.eastgate.metamaskclone.core.network
 import com.intellij.openapi.project.Project
 import dev.eastgate.metamaskclone.core.storage.Network
 import dev.eastgate.metamaskclone.core.storage.ProjectStorage
+import dev.eastgate.metamaskclone.models.BlockchainType
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -23,7 +24,7 @@ class NetworkManager private constructor(private val project: Project) {
     companion object {
         private val instances = ConcurrentHashMap<Project, NetworkManager>()
 
-        val DEFAULT_ENABLED_IDS = listOf("BNB_TESTNET", "ETH_SEPOLIA", "POLYGON_TESTNET")
+        val DEFAULT_ENABLED_IDS = listOf("BNB_TESTNET", "ETH_SEPOLIA", "POLYGON_TESTNET", "TRON_SHASTA")
 
         fun getInstance(project: Project): NetworkManager {
             return instances.computeIfAbsent(project) { NetworkManager(it) }
@@ -51,6 +52,13 @@ class NetworkManager private constructor(private val project: Project) {
             _selectedNetwork.value = network
             storage.setSelectedNetwork(networkId)
         }
+    }
+
+    /**
+     * Get the blockchain type of the currently selected network.
+     */
+    fun getCurrentBlockchainType(): BlockchainType {
+        return _selectedNetwork.value.blockchainType
     }
 
     fun getEnabledNetworks(): List<Network> {

@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "dev.eastgate.metamaskclone"
-version = "1.0"
+version = "1.1"
 
 configure<org.jlleitschuh.gradle.ktlint.KtlintExtension> {
     version.set("1.4.1")
@@ -63,6 +63,8 @@ dependencies {
 
     // Encryption
     implementation("org.bouncycastle:bcprov-jdk18on:1.78")
+
+    implementation(files("libs/tron-wallet-1.0.jar"))
 
     // Testing
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")

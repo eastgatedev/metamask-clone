@@ -51,10 +51,16 @@
             It is <strong>not intended</strong> for real asset management or end-user usage.
         </p>
 
+        <h2>Supported Networks</h2>
+        <ul>
+            <li><strong>EVM Networks:</strong> Ethereum, BNB Smart Chain, Polygon</li>
+            <li><strong>TRON Network:</strong> TRON Mainnet, Shasta Testnet (Early Support)</li>
+        </ul>
+
         <h2>Key Characteristics</h2>
         <ul>
             <li>Educational / showcase-oriented plugin</li>
-            <li>No real blockchain interaction</li>
+            <li>Multi-chain wallet architecture demonstration</li>
             <li>No custody of private keys</li>
             <li>No security guarantees</li>
             <li>No financial functionality</li>
@@ -103,13 +109,44 @@
             not to replicate or replace any existing product.
         </p>
 
-        <h2>Video Tutorial</h2>
+        <h2>Video Tutorial Series</h2>
         <p>
             Learn how to build this plugin step-by-step with our comprehensive video tutorial series:
         </p>
         <p>
-            <a href="https://www.youtube.com/playlist?list=PLbqZIOzRvr8mrKmli_WOVogsUTawr9dML">Watch the Tutorial Series on YouTube</a>
+            <a href="https://www.youtube.com/playlist?list=PLbqZIOzRvr8mrKmli_WOVogsUTawr9dML">Watch the Full Playlist on YouTube</a>
         </p>
+
+        <table>
+            <tr>
+                <th>Episode</th>
+                <th>Title</th>
+            </tr>
+            <tr>
+                <td>EP01</td>
+                <td><a href="https://youtu.be/OmCBY8EkklE">从零打造真实可商用钱包系统 | Build a Real &amp; Monetizable Crypto Wallet System from Scratch</a></td>
+            </tr>
+            <tr>
+                <td>EP02</td>
+                <td><a href="https://youtu.be/XGGEhTAuiWQ">工程师级 Sub-Agent 重建钱包 UI | AI Multi-Agent Rebuild of MetaMask UI</a></td>
+            </tr>
+            <tr>
+                <td>EP03</td>
+                <td><a href="https://youtu.be/SGxM09HeiPk">Kotlin Web3j EVM交易流程 | EVM Tx Flow - Transaction vs Receipt</a></td>
+            </tr>
+            <tr>
+                <td>EP04</td>
+                <td><a href="https://youtu.be/b3cxsHu1Dm4">从钱包系统角度理解 ERC20 | ERC20 Explained from a Wallet System Perspective</a></td>
+            </tr>
+            <tr>
+                <td>EP05</td>
+                <td><a href="https://youtu.be/KZtfq0mpnuw">从代码到 Marketplace | From Code to Marketplace</a></td>
+            </tr>
+            <tr>
+                <td>EP06</td>
+                <td><a href="https://youtu.be/7KM0kCrmv28">为什么TRON不是EVM(钱包系统视角) | Why TRON Is NOT EVM (Wallet System View)</a></td>
+            </tr>
+        </table>
 
         <hr/>
 
@@ -128,6 +165,22 @@
 
     <change-notes>
     <![CDATA[
+    <h2>Version 1.1</h2>
+
+    <ul>
+      <li><strong>TRON Blockchain Support (Early):</strong> Added TRON Mainnet and Shasta Testnet</li>
+      <li>Create, import, export, and delete TRON wallets</li>
+      <li>TRON wallets are managed separately from EVM wallets</li>
+      <li>Receive functionality with QR code for TRON addresses</li>
+      <li>Updated network RPC endpoints to use public nodes</li>
+      <li>Replaced deprecated Polygon Mumbai with Polygon Amoy testnet</li>
+      <li>Bug fixes and UI improvements</li>
+    </ul>
+
+    <p>
+    <strong>Note:</strong> TRON balance queries and send functionality are not yet implemented.
+    </p>
+
     <h2>Version 1.0</h2>
 
     <ul>
@@ -139,9 +192,8 @@
     </ul>
 
     <p>
-    This initial version is intended solely for
+    This plugin is intended solely for
     <strong>educational and demonstration purposes</strong>.
-    All behaviors are simulated and simplified.
     </p>
 
     ]]>

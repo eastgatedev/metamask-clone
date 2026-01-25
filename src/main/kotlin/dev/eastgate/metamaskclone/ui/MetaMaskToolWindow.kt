@@ -11,6 +11,7 @@ import dev.eastgate.metamaskclone.core.blockchain.TokenBalanceResult
 import dev.eastgate.metamaskclone.core.network.NetworkManager
 import dev.eastgate.metamaskclone.core.storage.ProjectStorage
 import dev.eastgate.metamaskclone.core.wallet.WalletManager
+import dev.eastgate.metamaskclone.models.BlockchainType
 import dev.eastgate.metamaskclone.models.Token
 import dev.eastgate.metamaskclone.models.Wallet
 import dev.eastgate.metamaskclone.ui.dialogs.*
@@ -99,6 +100,8 @@ class MetaMaskToolWindow(private val project: Project) {
             networkManager.selectedNetwork.collect { network ->
                 SwingUtilities.invokeLater {
                     networkSelectorBar.updateNetwork(network)
+                    // Select appropriate wallet for this blockchain type
+                    selectWalletForCurrentBlockchainType()
                     updateBalanceDisplay()
                     updateTokensUI()
                 }
@@ -111,9 +114,15 @@ class MetaMaskToolWindow(private val project: Project) {
         scope.launch {
             walletManager.wallets.collect { wallets ->
                 SwingUtilities.invokeLater {
-                    // If no wallet selected, select the first one
-                    if (walletManager.selectedWallet.value == null && wallets.isNotEmpty()) {
-                        walletManager.selectWallet(wallets.first().address)
+                    val blockchainType = networkManager.getCurrentBlockchainType()
+                    val walletsOfType = walletManager.getWalletsForBlockchainType(blockchainType)
+
+                    // If no wallet selected for this type, select the first one
+                    val currentWallet = walletManager.selectedWallet.value
+                    if (currentWallet == null || currentWallet.blockchainType != blockchainType) {
+                        if (walletsOfType.isNotEmpty()) {
+                            walletManager.selectWallet(walletsOfType.first().address)
+                        }
                     }
                 }
             }
@@ -226,6 +235,20 @@ class MetaMaskToolWindow(private val project: Project) {
     }
 
     /**
+     * Select a wallet matching the current blockchain type.
+     * If current wallet doesn't match, switch to the first wallet of that type.
+     */
+    private fun selectWalletForCurrentBlockchainType() {
+        val blockchainType = networkManager.getCurrentBlockchainType()
+        val currentWallet = walletManager.selectedWallet.value
+
+        // If current wallet doesn't match blockchain type, switch
+        if (currentWallet == null || currentWallet.blockchainType != blockchainType) {
+            walletManager.selectFirstWalletForType(blockchainType)
+        }
+    }
+
+    /**
      * Refresh token balances from blockchain.
      * Called on startup, network/wallet changes, and after transactions.
      */
@@ -276,15 +299,17 @@ class MetaMaskToolWindow(private val project: Project) {
     }
 
     private fun showWalletSelectionPopup() {
-        val wallets = walletManager.wallets.value
+        val blockchainType = networkManager.getCurrentBlockchainType()
+        val wallets = walletManager.getWalletsForBlockchainType(blockchainType)
+
         if (wallets.isEmpty()) {
-            showCreateOrImportDialog()
+            showCreateOrImportDialog(blockchainType)
             return
         }
 
         val popup = JPopupMenu()
 
-        // Wallet list
+        // Wallet list (filtered by blockchain type)
         for (wallet in wallets) {
             val isSelected = walletManager.selectedWallet.value?.address == wallet.address
             val menuItem = JMenuItem(if (isSelected) "✓ ${wallet.name}" else "   ${wallet.name}")
@@ -297,18 +322,26 @@ class MetaMaskToolWindow(private val project: Project) {
 
         popup.addSeparator()
 
-        // Create new wallet
-        val createItem = JMenuItem("+ Create New Wallet")
+        // Create new wallet (with blockchain type label)
+        val createLabel = when (blockchainType) {
+            BlockchainType.EVM -> "+ Create New Wallet"
+            BlockchainType.TRON -> "+ Create New TRON Wallet"
+        }
+        val createItem = JMenuItem(createLabel)
         createItem.addActionListener {
-            val dialog = CreateWalletDialog(project, walletManager)
+            val dialog = CreateWalletDialog(project, walletManager, blockchainType)
             dialog.show()
         }
         popup.add(createItem)
 
-        // Import wallet
-        val importItem = JMenuItem("+ Import Wallet")
+        // Import wallet (with blockchain type label)
+        val importLabel = when (blockchainType) {
+            BlockchainType.EVM -> "+ Import Wallet"
+            BlockchainType.TRON -> "+ Import TRON Wallet"
+        }
+        val importItem = JMenuItem(importLabel)
         importItem.addActionListener {
-            val dialog = ImportWalletDialog(project, walletManager)
+            val dialog = ImportWalletDialog(project, walletManager, blockchainType)
             dialog.show()
         }
         popup.add(importItem)
@@ -317,7 +350,7 @@ class MetaMaskToolWindow(private val project: Project) {
 
         // Wallet management
         val selectedWallet = walletManager.selectedWallet.value
-        if (selectedWallet != null) {
+        if (selectedWallet != null && selectedWallet.blockchainType == blockchainType) {
             val exportItem = JMenuItem("Export Private Key")
             exportItem.addActionListener {
                 exportPrivateKey(selectedWallet)
@@ -334,11 +367,16 @@ class MetaMaskToolWindow(private val project: Project) {
         popup.show(walletSelectorBar, 0, walletSelectorBar.height)
     }
 
-    private fun showCreateOrImportDialog() {
+    private fun showCreateOrImportDialog(blockchainType: BlockchainType = BlockchainType.EVM) {
+        val chainName = when (blockchainType) {
+            BlockchainType.EVM -> "EVM"
+            BlockchainType.TRON -> "TRON"
+        }
+
         val options = arrayOf("Create New", "Import Existing", "Cancel")
         val result = Messages.showDialog(
             project,
-            "No wallets found. Would you like to create a new wallet or import an existing one?",
+            "No $chainName wallets found. Would you like to create a new wallet or import an existing one?",
             "No Wallet",
             options,
             0,
@@ -347,11 +385,11 @@ class MetaMaskToolWindow(private val project: Project) {
 
         when (result) {
             0 -> {
-                val dialog = CreateWalletDialog(project, walletManager)
+                val dialog = CreateWalletDialog(project, walletManager, blockchainType)
                 dialog.show()
             }
             1 -> {
-                val dialog = ImportWalletDialog(project, walletManager)
+                val dialog = ImportWalletDialog(project, walletManager, blockchainType)
                 dialog.show()
             }
         }

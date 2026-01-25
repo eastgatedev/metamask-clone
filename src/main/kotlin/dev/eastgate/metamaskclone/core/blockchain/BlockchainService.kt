@@ -2,6 +2,7 @@ package dev.eastgate.metamaskclone.core.blockchain
 
 import com.intellij.openapi.project.Project
 import dev.eastgate.metamaskclone.core.storage.Network
+import dev.eastgate.metamaskclone.models.BlockchainType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -62,12 +63,22 @@ class BlockchainService private constructor(private val project: Project) {
 
     /**
      * Fetch native coin balance for an address.
+     * Returns 0 for TRON networks (not implemented yet).
      */
     suspend fun getBalance(
         address: String,
         network: Network
     ): BalanceResult =
         withContext(Dispatchers.IO) {
+            // TRON balance fetching not implemented yet - return 0
+            if (network.blockchainType == BlockchainType.TRON) {
+                return@withContext BalanceResult.Success(
+                    balanceWei = BigInteger.ZERO,
+                    balanceFormatted = "0",
+                    symbol = network.symbol
+                )
+            }
+
             try {
                 val web3j = getWeb3j(network)
                 val balanceResponse = web3j.ethGetBalance(address, DefaultBlockParameterName.LATEST).send()
@@ -304,6 +315,7 @@ class BlockchainService private constructor(private val project: Project) {
 
     /**
      * Fetch ERC20 token balance for an address.
+     * Returns 0 for TRON networks (TRC20 not implemented yet).
      *
      * @param contractAddress The token contract address
      * @param walletAddress The wallet address to check balance for
@@ -317,6 +329,14 @@ class BlockchainService private constructor(private val project: Project) {
         network: Network
     ): TokenBalanceResult =
         withContext(Dispatchers.IO) {
+            // TRON (TRC20) token balance fetching not implemented yet - return 0
+            if (network.blockchainType == BlockchainType.TRON) {
+                return@withContext TokenBalanceResult.Success(
+                    balanceRaw = BigInteger.ZERO,
+                    balanceFormatted = "0"
+                )
+            }
+
             try {
                 if (!isValidAddress(contractAddress)) {
                     return@withContext TokenBalanceResult.Error("Invalid contract address: $contractAddress")

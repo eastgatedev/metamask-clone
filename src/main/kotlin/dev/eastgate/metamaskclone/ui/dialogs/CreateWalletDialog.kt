@@ -6,6 +6,7 @@ import com.intellij.openapi.ui.Messages
 import com.intellij.ui.components.JBPasswordField
 import com.intellij.ui.components.JBTextField
 import dev.eastgate.metamaskclone.core.wallet.WalletManager
+import dev.eastgate.metamaskclone.models.BlockchainType
 import java.awt.GridBagConstraints
 import java.awt.GridBagLayout
 import java.awt.Insets
@@ -13,14 +14,18 @@ import javax.swing.*
 
 class CreateWalletDialog(
     private val project: Project,
-    private val walletManager: WalletManager
+    private val walletManager: WalletManager,
+    private val blockchainType: BlockchainType = BlockchainType.EVM
 ) : DialogWrapper(project) {
     private val nameField = JBTextField()
     private val passwordField = JBPasswordField()
     private val confirmPasswordField = JBPasswordField()
 
     init {
-        title = "Create New Wallet"
+        title = when (blockchainType) {
+            BlockchainType.EVM -> "Create New Wallet"
+            BlockchainType.TRON -> "Create New TRON Wallet"
+        }
         init()
     }
 
@@ -37,7 +42,11 @@ class CreateWalletDialog(
 
         gbc.gridx = 1
         gbc.weightx = 1.0
-        nameField.text = "Wallet ${walletManager.wallets.value.size + 1}"
+        val walletCount = walletManager.getWalletCountForType(blockchainType)
+        nameField.text = when (blockchainType) {
+            BlockchainType.EVM -> "Wallet ${walletCount + 1}"
+            BlockchainType.TRON -> "TRON Wallet ${walletCount + 1}"
+        }
         panel.add(nameField, gbc)
 
         // Password
@@ -96,9 +105,13 @@ class CreateWalletDialog(
         }
 
         try {
-            val wallet = walletManager.createWallet(name, password)
+            val wallet = walletManager.createWallet(name, password, blockchainType)
+            val addressLabel = when (blockchainType) {
+                BlockchainType.EVM -> "Address"
+                BlockchainType.TRON -> "TRON Address"
+            }
             Messages.showInfoMessage(
-                "Wallet created successfully!\nAddress: ${wallet.address}",
+                "Wallet created successfully!\n$addressLabel: ${wallet.address}",
                 "Success"
             )
             super.doOKAction()
