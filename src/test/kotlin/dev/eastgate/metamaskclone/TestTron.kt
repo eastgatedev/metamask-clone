@@ -49,7 +49,7 @@ class TestTron {
     companion object {
         // Test private key (NEVER use in production!)
         // This is a well-known test key for demonstration purposes only
-        const val TEST_PRIVATE_KEY = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        const val TEST_PRIVATE_KEY = "<your-key>"
 
         // TRON address prefix bytes
         const val TRON_MAINNET_PREFIX: Byte = 0x41.toByte() // Mainnet addresses start with 'T'

@@ -54,7 +54,7 @@
         <h2>Supported Networks</h2>
         <ul>
             <li><strong>EVM Networks:</strong> Ethereum, BNB Smart Chain, Polygon</li>
-            <li><strong>TRON Network:</strong> TRON Mainnet, Shasta Testnet (Early Support)</li>
+            <li><strong>TRON Network:</strong> TRON Mainnet, Shasta Testnet</li>
         </ul>
 
         <h2>Key Characteristics</h2>
@@ -146,6 +146,10 @@
                 <td>EP06</td>
                 <td><a href="https://youtu.be/7KM0kCrmv28">为什么TRON不是EVM(钱包系统视角) | Why TRON Is NOT EVM (Wallet System View)</a></td>
             </tr>
+            <tr>
+                <td>EP07</td>
+                <td><a href="https://youtu.be/vSEKXA5KOVg">TRON 钱包运行期: 从 Balance 到 Transfer | TRON Wallet Runtime: From Balance to Transfer</a></td>
+            </tr>
         </table>
 
         <hr/>
@@ -165,6 +169,16 @@
 
     <change-notes>
     <![CDATA[
+    <h2>Version 1.2</h2>
+
+    <ul>
+      <li><strong>TRX Balance Display:</strong> View TRX balance for TRON wallets via gRPC</li>
+      <li><strong>TRX Transfer:</strong> Send TRX to other TRON addresses</li>
+      <li>TRON transactions show "Free (uses bandwidth)" instead of gas fees</li>
+      <li>Proper TRON address validation (T-prefix, 34 characters)</li>
+      <li>TronScan explorer integration for transaction viewing</li>
+    </ul>
+
     <h2>Version 1.1</h2>
 
     <ul>
@@ -176,10 +190,6 @@
       <li>Replaced deprecated Polygon Mumbai with Polygon Amoy testnet</li>
       <li>Bug fixes and UI improvements</li>
     </ul>
-
-    <p>
-    <strong>Note:</strong> TRON balance queries and send functionality are not yet implemented.
-    </p>
 
     <h2>Version 1.0</h2>
 

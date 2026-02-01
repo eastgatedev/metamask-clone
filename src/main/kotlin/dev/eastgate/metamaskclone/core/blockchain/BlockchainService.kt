@@ -22,11 +22,13 @@ import java.math.BigInteger
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Service for blockchain operations using Web3j.
- * Provides balance fetching, gas price queries, and transaction sending.
+ * Service for blockchain operations using Web3j and TronGrpcClient.
+ * Provides balance fetching, gas price queries, and transaction sending
+ * for both EVM and TRON networks.
  */
 class BlockchainService private constructor(private val project: Project) {
     private val web3jInstances = ConcurrentHashMap<String, Web3j>()
+    private val tronClients = ConcurrentHashMap<String, TronGrpcClient>()
 
     companion object {
         private val instances = ConcurrentHashMap<Project, BlockchainService>()
@@ -52,6 +54,21 @@ class BlockchainService private constructor(private val project: Project) {
     }
 
     /**
+     * Get or create TronGrpcClient instance for a TRON network.
+     * Instances are cached per network ID.
+     * Only supports predefined TRON networks (mainnet and shasta).
+     */
+    private fun getTronClient(network: Network): TronGrpcClient {
+        return tronClients.computeIfAbsent(network.id) {
+            when (network.id) {
+                "TRON_MAINNET" -> TronGrpcClient.ofMainnet()
+                "TRON_SHASTA" -> TronGrpcClient.ofShasta()
+                else -> throw IllegalStateException("Unknown TRON network: ${network.id}")
+            }
+        }
+    }
+
+    /**
      * Validate Ethereum address format.
      */
     private fun isValidAddress(address: String): Boolean {
@@ -62,23 +79,40 @@ class BlockchainService private constructor(private val project: Project) {
     }
 
     /**
+     * Validate TRON address format.
+     * TRON addresses are Base58Check encoded, 34 characters, starting with 'T'.
+     */
+    private fun isValidTronAddress(address: String): Boolean {
+        return address.startsWith("T") && address.length == 34
+    }
+
+    /**
      * Fetch native coin balance for an address.
-     * Returns 0 for TRON networks (not implemented yet).
+     * Supports both EVM (ETH, BNB, etc.) and TRON networks.
      */
     suspend fun getBalance(
         address: String,
         network: Network
     ): BalanceResult =
         withContext(Dispatchers.IO) {
-            // TRON balance fetching not implemented yet - return 0
+            // Handle TRON networks using TronGrpcClient
             if (network.blockchainType == BlockchainType.TRON) {
-                return@withContext BalanceResult.Success(
-                    balanceWei = BigInteger.ZERO,
-                    balanceFormatted = "0",
-                    symbol = network.symbol
-                )
+                return@withContext try {
+                    val client = getTronClient(network)
+                    val balanceTrx = client.getBalance(address)
+                    // Convert TRX to SUN for consistency (1 TRX = 1,000,000 SUN)
+                    val balanceSun = balanceTrx.multiply(BigDecimal(TronGrpcClient.SUN_PER_TRX)).toBigInteger()
+                    BalanceResult.Success(
+                        balanceWei = balanceSun, // Using balanceWei field for SUN
+                        balanceFormatted = balanceTrx.stripTrailingZeros().toPlainString(),
+                        symbol = network.symbol
+                    )
+                } catch (e: Exception) {
+                    BalanceResult.Error(e.message ?: "Failed to fetch TRX balance")
+                }
             }
 
+            // Handle EVM networks using Web3j
             try {
                 val web3j = getWeb3j(network)
                 val balanceResponse = web3j.ethGetBalance(address, DefaultBlockParameterName.LATEST).send()
@@ -235,6 +269,55 @@ class BlockchainService private constructor(private val project: Project) {
         }
 
     /**
+     * Send TRX (TRON native coin) to an address.
+     *
+     * @param fromAddress The sender's TRON address (Base58Check, starts with T)
+     * @param toAddress The recipient's TRON address (Base58Check, starts with T)
+     * @param amount Amount to send in TRX units
+     * @param privateKey The sender's private key (64-character hex string without 0x prefix)
+     * @param network The TRON network to send on
+     */
+    suspend fun sendTronNativeCoin(
+        fromAddress: String,
+        toAddress: String,
+        amount: BigDecimal,
+        privateKey: String,
+        network: Network
+    ): TransactionResult =
+        withContext(Dispatchers.IO) {
+            try {
+                // Validate TRON addresses
+                if (!isValidTronAddress(fromAddress)) {
+                    return@withContext TransactionResult.Error("Invalid TRON from address: $fromAddress")
+                }
+                if (!isValidTronAddress(toAddress)) {
+                    return@withContext TransactionResult.Error("Invalid TRON to address: $toAddress")
+                }
+
+                val client = getTronClient(network)
+
+                // Strip 0x prefix if present (TronGrpcClient expects raw hex)
+                val cleanPrivateKey = if (privateKey.startsWith("0x")) {
+                    privateKey.substring(2)
+                } else {
+                    privateKey
+                }
+
+                val txId = client.sendTrx(fromAddress, toAddress, cleanPrivateKey, amount)
+
+                // TRON uses different explorer URL format with hash fragment
+                val explorerUrl = network.blockExplorerUrl?.let { "$it/#/transaction/$txId" }
+
+                TransactionResult.Success(
+                    transactionHash = txId,
+                    explorerUrl = explorerUrl
+                )
+            } catch (e: Exception) {
+                TransactionResult.Error(e.message ?: "TRX transfer failed")
+            }
+        }
+
+    /**
      * Wait for transaction confirmation by polling for receipt.
      *
      * @param txHash Transaction hash to check
@@ -315,7 +398,7 @@ class BlockchainService private constructor(private val project: Project) {
 
     /**
      * Fetch ERC20 token balance for an address.
-     * Returns 0 for TRON networks (TRC20 not implemented yet).
+     * Note: TRC20 tokens on TRON are not yet supported.
      *
      * @param contractAddress The token contract address
      * @param walletAddress The wallet address to check balance for
@@ -329,12 +412,9 @@ class BlockchainService private constructor(private val project: Project) {
         network: Network
     ): TokenBalanceResult =
         withContext(Dispatchers.IO) {
-            // TRON (TRC20) token balance fetching not implemented yet - return 0
+            // TRC20 token balance fetching not implemented yet - return error for TRON
             if (network.blockchainType == BlockchainType.TRON) {
-                return@withContext TokenBalanceResult.Success(
-                    balanceRaw = BigInteger.ZERO,
-                    balanceFormatted = "0"
-                )
+                return@withContext TokenBalanceResult.Error("TRC20 tokens not yet supported")
             }
 
             try {
@@ -439,19 +519,23 @@ class BlockchainService private constructor(private val project: Project) {
         }
 
     /**
-     * Invalidate cached Web3j instance for a network.
+     * Invalidate cached client instance for a network.
      * Useful when network RPC URL changes.
+     * Handles both Web3j (EVM) and TronGrpcClient (TRON) instances.
      */
     fun invalidateNetwork(networkId: String) {
         web3jInstances.remove(networkId)?.shutdown()
+        tronClients.remove(networkId)?.close()
     }
 
     /**
-     * Clean up all Web3j instances.
+     * Clean up all client instances (Web3j and TronGrpcClient).
      */
     fun shutdown() {
         web3jInstances.values.forEach { it.shutdown() }
         web3jInstances.clear()
+        tronClients.values.forEach { it.close() }
+        tronClients.clear()
     }
 }
 

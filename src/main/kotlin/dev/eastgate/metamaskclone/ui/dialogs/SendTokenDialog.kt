@@ -12,6 +12,7 @@ import dev.eastgate.metamaskclone.core.blockchain.TokenTransferResult
 import dev.eastgate.metamaskclone.core.blockchain.TransactionResult
 import dev.eastgate.metamaskclone.core.storage.Network
 import dev.eastgate.metamaskclone.core.wallet.WalletManager
+import dev.eastgate.metamaskclone.models.BlockchainType
 import dev.eastgate.metamaskclone.models.Token
 import dev.eastgate.metamaskclone.models.Wallet
 import dev.eastgate.metamaskclone.utils.ClipboardUtil
@@ -54,26 +55,36 @@ class SendTokenDialog(
     private var gasPriceLoaded = false
     private var balanceLoaded = false
 
+    // Gas UI components that may be hidden for TRON
+    private lateinit var gasSettingsSeparator: JSeparator
+    private lateinit var gasSettingsLabel: JLabel
+    private lateinit var gasLimitLabel: JLabel
+    private lateinit var gasPriceLabel: JLabel
+
+    // Check if this is a TRON network
+    private val isTronNetwork = network.blockchainType == BlockchainType.TRON
+
     init {
         title = "Send ${network.symbol}"
         isOKActionEnabled = false // Disable until data is loaded
         init()
         setupTokenSelector()
-        fetchGasPrice()
-        fetchBalance()
+        setupForBlockchainType()
     }
 
     private fun setupTokenSelector() {
         // Add native token option
         tokenSelector.addItem("${network.symbol} (Native Token)")
 
-        // Add available tokens
-        for (t in availableTokens) {
-            tokenSelector.addItem("${t.symbol} - ${t.name}")
+        // Add available tokens (only for EVM networks - TRC20 not yet supported)
+        if (!isTronNetwork) {
+            for (t in availableTokens) {
+                tokenSelector.addItem("${t.symbol} - ${t.name}")
+            }
         }
 
-        // Select the provided token if any
-        if (token != null) {
+        // Select the provided token if any (only for EVM)
+        if (!isTronNetwork && token != null) {
             val index = availableTokens.indexOfFirst { it.id == token.id }
             if (index >= 0) {
                 tokenSelector.selectedIndex = index + 1 // +1 because of native token
@@ -88,13 +99,45 @@ class SendTokenDialog(
         }
     }
 
+    /**
+     * Setup UI based on blockchain type.
+     * TRON networks hide gas fields and show bandwidth info instead.
+     */
+    private fun setupForBlockchainType() {
+        if (isTronNetwork) {
+            // Hide gas-related UI for TRON
+            gasSettingsSeparator.isVisible = false
+            gasSettingsLabel.isVisible = false
+            gasLimitLabel.isVisible = false
+            gasLimitField.isVisible = false
+            gasPriceLabel.isVisible = false
+            gasPriceField.isVisible = false
+
+            // Update fee display for TRON (uses bandwidth, typically free)
+            estimatedFeeLabel.text = "Free (uses bandwidth)"
+            estimatedFeeLabel.foreground = java.awt.Color(0x059669) // Green
+
+            // Mark gas as loaded since we don't need it for TRON
+            gasPriceLoaded = true
+
+            // Fetch balance only
+            fetchBalance()
+        } else {
+            // EVM networks: fetch gas price and balance
+            fetchGasPrice()
+            fetchBalance()
+        }
+    }
+
     private fun onTokenSelectionChanged() {
         if (tokenSelector.selectedIndex == 0) {
             // Native token selected
-            gasLimitField.text = "21000"
+            if (!isTronNetwork) {
+                gasLimitField.text = "21000"
+            }
             fetchBalance()
         } else {
-            // ERC20 token selected
+            // ERC20 token selected (only for EVM)
             gasLimitField.text = "100000"
             fetchTokenBalance()
         }
@@ -216,23 +259,36 @@ class SendTokenDialog(
     private fun updateTotalEstimate() {
         try {
             val amount = amountField.text.trim().toBigDecimalOrNull() ?: BigDecimal.ZERO
-            val gasLimit = gasLimitField.text.trim().toLongOrNull() ?: 21000L
-            val gasPriceGwei = gasPriceField.text.trim().toBigDecimalOrNull() ?: BigDecimal.ZERO
 
-            // Calculate fee: gasLimit * gasPrice (convert Gwei to Ether)
-            val gasPriceEther = gasPriceGwei.divide(BigDecimal("1000000000"), 18, RoundingMode.HALF_UP)
-            val fee = BigDecimal(gasLimit).multiply(gasPriceEther)
-            val total = amount.add(fee)
+            if (isTronNetwork) {
+                // TRON: No gas fees, just show the amount
+                estimatedFeeLabel.text = "Free (uses bandwidth)"
+                estimatedFeeLabel.foreground = java.awt.Color(0x059669) // Green
+                val totalFormatted = amount.setScale(6, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString()
+                totalLabel.text = "$totalFormatted ${network.symbol}"
+                totalLabel.font = totalLabel.font.deriveFont(java.awt.Font.BOLD)
+            } else {
+                // EVM: Calculate gas fees
+                val gasLimit = gasLimitField.text.trim().toLongOrNull() ?: 21000L
+                val gasPriceGwei = gasPriceField.text.trim().toBigDecimalOrNull() ?: BigDecimal.ZERO
 
-            // Format for display (max 8 decimal places)
-            val feeFormatted = fee.setScale(8, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString()
-            val totalFormatted = total.setScale(8, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString()
+                // Calculate fee: gasLimit * gasPrice (convert Gwei to Ether)
+                val gasPriceEther = gasPriceGwei.divide(BigDecimal("1000000000"), 18, RoundingMode.HALF_UP)
+                val fee = BigDecimal(gasLimit).multiply(gasPriceEther)
+                val total = amount.add(fee)
 
-            estimatedFeeLabel.text = "$feeFormatted ${network.symbol}"
-            totalLabel.text = "$totalFormatted ${network.symbol}"
-            totalLabel.font = totalLabel.font.deriveFont(java.awt.Font.BOLD)
+                // Format for display (max 8 decimal places)
+                val feeFormatted = fee.setScale(8, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString()
+                val totalFormatted = total.setScale(8, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString()
+
+                estimatedFeeLabel.text = "$feeFormatted ${network.symbol}"
+                totalLabel.text = "$totalFormatted ${network.symbol}"
+                totalLabel.font = totalLabel.font.deriveFont(java.awt.Font.BOLD)
+            }
         } catch (e: Exception) {
-            estimatedFeeLabel.text = "--"
+            if (!isTronNetwork) {
+                estimatedFeeLabel.text = "--"
+            }
             totalLabel.text = "--"
         }
     }
@@ -300,7 +356,7 @@ class SendTokenDialog(
         gbc.gridx = 1
         gbc.weightx = 1.0
         toAddressField.columns = 30
-        toAddressField.toolTipText = "Recipient address (0x...)"
+        toAddressField.toolTipText = if (isTronNetwork) "Recipient TRON address (T...)" else "Recipient address (0x...)"
         panel.add(toAddressField, gbc)
 
         // Token selector
@@ -326,18 +382,19 @@ class SendTokenDialog(
         amountField.toolTipText = "Amount to send"
         panel.add(amountField, gbc)
 
-        // Gas settings section
+        // Gas settings section (hidden for TRON)
         row++
         gbc.gridx = 0
         gbc.gridy = row
         gbc.gridwidth = 2
-        panel.add(JSeparator(), gbc)
+        gasSettingsSeparator = JSeparator()
+        panel.add(gasSettingsSeparator, gbc)
 
         row++
         gbc.gridy = row
-        val gasLabel = JLabel("Gas Settings")
-        gasLabel.font = gasLabel.font.deriveFont(java.awt.Font.BOLD)
-        panel.add(gasLabel, gbc)
+        gasSettingsLabel = JLabel("Gas Settings")
+        gasSettingsLabel.font = gasSettingsLabel.font.deriveFont(java.awt.Font.BOLD)
+        panel.add(gasSettingsLabel, gbc)
 
         // Gas Limit
         row++
@@ -345,7 +402,8 @@ class SendTokenDialog(
         gbc.gridy = row
         gbc.gridwidth = 1
         gbc.weightx = 0.0
-        panel.add(JLabel("Gas Limit:"), gbc)
+        gasLimitLabel = JLabel("Gas Limit:")
+        panel.add(gasLimitLabel, gbc)
 
         gbc.gridx = 1
         gbc.weightx = 1.0
@@ -357,7 +415,8 @@ class SendTokenDialog(
         gbc.gridx = 0
         gbc.gridy = row
         gbc.weightx = 0.0
-        panel.add(JLabel("Gas Price (Gwei):"), gbc)
+        gasPriceLabel = JLabel("Gas Price (Gwei):")
+        panel.add(gasPriceLabel, gbc)
 
         gbc.gridx = 1
         gbc.weightx = 1.0
@@ -412,9 +471,17 @@ class SendTokenDialog(
             return
         }
 
-        if (!toAddress.startsWith("0x") || toAddress.length != 42) {
-            Messages.showErrorDialog("Invalid address format. Must be a 42-character hex address starting with 0x", "Validation Error")
-            return
+        // Validate address format based on blockchain type
+        if (isTronNetwork) {
+            if (!toAddress.startsWith("T") || toAddress.length != 34) {
+                Messages.showErrorDialog("Invalid TRON address format. Must be a 34-character address starting with T", "Validation Error")
+                return
+            }
+        } else {
+            if (!toAddress.startsWith("0x") || toAddress.length != 42) {
+                Messages.showErrorDialog("Invalid address format. Must be a 42-character hex address starting with 0x", "Validation Error")
+                return
+            }
         }
 
         if (amount.isEmpty()) {
@@ -428,23 +495,39 @@ class SendTokenDialog(
             return
         }
 
-        // Validate gas settings
-        val gasLimitValue = gasLimitField.text.toLongOrNull()
-        if (gasLimitValue == null || gasLimitValue <= 0) {
-            Messages.showErrorDialog("Please enter a valid gas limit", "Validation Error")
-            return
-        }
+        // Gas validation only for EVM networks
+        val gasLimitValue: Long
+        val gasPriceValue: BigDecimal
+        val gasPriceWei: BigInteger
+        val gasLimit: BigInteger
+        val gasFeeWei: BigInteger
 
-        val gasPriceValue = gasPriceField.text.toBigDecimalOrNull()
-        if (gasPriceValue == null || gasPriceValue <= BigDecimal.ZERO) {
-            Messages.showErrorDialog("Please enter a valid gas price", "Validation Error")
-            return
-        }
+        if (isTronNetwork) {
+            // TRON doesn't use gas - use zero values
+            gasLimitValue = 0L
+            gasPriceValue = BigDecimal.ZERO
+            gasPriceWei = BigInteger.ZERO
+            gasLimit = BigInteger.ZERO
+            gasFeeWei = BigInteger.ZERO
+        } else {
+            // Validate gas settings for EVM
+            gasLimitValue = gasLimitField.text.toLongOrNull() ?: 0L
+            if (gasLimitValue <= 0) {
+                Messages.showErrorDialog("Please enter a valid gas limit", "Validation Error")
+                return
+            }
 
-        // Calculate gas fees
-        val gasPriceWei = Convert.toWei(gasPriceValue, Convert.Unit.GWEI).toBigInteger()
-        val gasLimit = BigInteger.valueOf(gasLimitValue)
-        val gasFeeWei = gasPriceWei.multiply(gasLimit)
+            gasPriceValue = gasPriceField.text.toBigDecimalOrNull() ?: BigDecimal.ZERO
+            if (gasPriceValue <= BigDecimal.ZERO) {
+                Messages.showErrorDialog("Please enter a valid gas price", "Validation Error")
+                return
+            }
+
+            // Calculate gas fees
+            gasPriceWei = Convert.toWei(gasPriceValue, Convert.Unit.GWEI).toBigInteger()
+            gasLimit = BigInteger.valueOf(gasLimitValue)
+            gasFeeWei = gasPriceWei.multiply(gasLimit)
+        }
 
         // Disable dialog while checking balance
         isOKActionEnabled = false
@@ -469,32 +552,54 @@ class SendTokenDialog(
                 when (nativeBalanceResult) {
                     is BalanceResult.Success -> {
                         if (isNativeToken) {
-                            // Native token: check amount + gas fees
-                            val amountWei = Convert.toWei(amountValue, Convert.Unit.ETHER).toBigInteger()
-                            val totalRequiredWei = amountWei.add(gasFeeWei)
+                            if (isTronNetwork) {
+                                // TRON: Convert amount to SUN for comparison (1 TRX = 1,000,000 SUN)
+                                val amountSun = amountValue.multiply(BigDecimal(1_000_000L)).toBigInteger()
 
-                            if (nativeBalanceResult.balanceWei < totalRequiredWei) {
-                                val balanceFormatted = Convert.fromWei(BigDecimal(nativeBalanceResult.balanceWei), Convert.Unit.ETHER)
-                                val totalRequired = Convert.fromWei(BigDecimal(totalRequiredWei), Convert.Unit.ETHER)
-                                val gasFee = Convert.fromWei(BigDecimal(gasFeeWei), Convert.Unit.ETHER)
+                                if (nativeBalanceResult.balanceWei < amountSun) {
+                                    Messages.showErrorDialog(
+                                        project,
+                                        """
+                                        Insufficient TRX balance.
 
-                                Messages.showErrorDialog(
-                                    project,
-                                    """
-                                    Insufficient balance for this transaction.
+                                        Your balance: ${nativeBalanceResult.balanceFormatted} ${network.symbol}
+                                        Amount to send: $amountValue ${network.symbol}
+                                        """.trimIndent(),
+                                        "Insufficient Balance"
+                                    )
+                                    return@invokeLater
+                                }
 
-                                    Your balance: $balanceFormatted ${network.symbol}
-                                    Amount to send: $amountValue ${network.symbol}
-                                    Estimated gas fee: $gasFee ${network.symbol}
-                                    Total required: $totalRequired ${network.symbol}
-                                    """.trimIndent(),
-                                    "Insufficient Balance"
-                                )
-                                return@invokeLater
+                                // Balance is sufficient, proceed with TRON transaction
+                                proceedWithTronTransaction(toAddress, amountValue)
+                            } else {
+                                // EVM: check amount + gas fees
+                                val amountWei = Convert.toWei(amountValue, Convert.Unit.ETHER).toBigInteger()
+                                val totalRequiredWei = amountWei.add(gasFeeWei)
+
+                                if (nativeBalanceResult.balanceWei < totalRequiredWei) {
+                                    val balanceFormatted = Convert.fromWei(BigDecimal(nativeBalanceResult.balanceWei), Convert.Unit.ETHER)
+                                    val totalRequired = Convert.fromWei(BigDecimal(totalRequiredWei), Convert.Unit.ETHER)
+                                    val gasFee = Convert.fromWei(BigDecimal(gasFeeWei), Convert.Unit.ETHER)
+
+                                    Messages.showErrorDialog(
+                                        project,
+                                        """
+                                        Insufficient balance for this transaction.
+
+                                        Your balance: $balanceFormatted ${network.symbol}
+                                        Amount to send: $amountValue ${network.symbol}
+                                        Estimated gas fee: $gasFee ${network.symbol}
+                                        Total required: $totalRequired ${network.symbol}
+                                        """.trimIndent(),
+                                        "Insufficient Balance"
+                                    )
+                                    return@invokeLater
+                                }
+
+                                // Balance is sufficient, proceed with password prompt
+                                proceedWithNativeTransaction(toAddress, amountValue, gasLimit, gasPriceWei)
                             }
-
-                            // Balance is sufficient, proceed with password prompt
-                            proceedWithNativeTransaction(toAddress, amountValue, gasLimit, gasPriceWei)
                         } else {
                             // ERC20 token: check gas fees only from native balance
                             if (nativeBalanceResult.balanceWei < gasFeeWei) {
@@ -631,6 +736,95 @@ class SendTokenDialog(
                     }
                     is TransactionResult.Error -> {
                         Messages.showErrorDialog(project, "Transaction failed: ${result.message}", "Error")
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Handle TRON native coin (TRX) transfer.
+     * TRON uses bandwidth instead of gas, so no gas parameters needed.
+     */
+    private fun proceedWithTronTransaction(
+        toAddress: String,
+        amountValue: BigDecimal
+    ) {
+        // Request password for private key
+        val password = Messages.showPasswordDialog(
+            "Enter wallet password to sign transaction:",
+            "Sign Transaction"
+        )
+
+        if (password.isNullOrEmpty()) {
+            return
+        }
+
+        // Get private key
+        val privateKey: String
+        try {
+            privateKey = walletManager.exportPrivateKey(wallet.address, password)
+        } catch (e: Exception) {
+            Messages.showErrorDialog(project, "Invalid password or wallet error: ${e.message}", "Error")
+            return
+        }
+
+        // Confirm transaction (no gas info for TRON)
+        val confirmMessage = """
+            Send $amountValue ${network.symbol} to:
+            $toAddress
+
+            Network Fee: Free (uses bandwidth)
+
+            Continue?
+        """.trimIndent()
+
+        val confirmed = Messages.showYesNoDialog(
+            project,
+            confirmMessage,
+            "Confirm TRX Transfer",
+            Messages.getQuestionIcon()
+        )
+
+        if (confirmed != Messages.YES) {
+            return
+        }
+
+        // Disable dialog while sending
+        isOKActionEnabled = false
+        rootPane?.cursor = Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR)
+
+        scope.launch {
+            val result = blockchainService.sendTronNativeCoin(
+                fromAddress = wallet.address,
+                toAddress = toAddress,
+                amount = amountValue,
+                privateKey = privateKey,
+                network = network
+            )
+
+            SwingUtilities.invokeLater {
+                rootPane?.cursor = Cursor.getDefaultCursor()
+                isOKActionEnabled = true
+
+                when (result) {
+                    is TransactionResult.Success -> {
+                        val message = buildString {
+                            append("TRX transfer sent successfully!\n\n")
+                            append("Transaction ID:\n${result.transactionHash}\n\n")
+                            result.explorerUrl?.let {
+                                append("View on TronScan:\n$it")
+                            }
+                        }
+                        Messages.showInfoMessage(project, message, "TRX Transfer Sent")
+
+                        // Copy tx hash to clipboard
+                        ClipboardUtil.copyToClipboard(result.transactionHash)
+
+                        super.doOKAction()
+                    }
+                    is TransactionResult.Error -> {
+                        Messages.showErrorDialog(project, "TRX transfer failed: ${result.message}", "Error")
                     }
                 }
             }

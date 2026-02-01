@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "dev.eastgate.metamaskclone"
-version = "1.1"
+version = "1.2"
 
 configure<org.jlleitschuh.gradle.ktlint.KtlintExtension> {
     version.set("1.4.1")
@@ -65,6 +65,15 @@ dependencies {
     implementation("org.bouncycastle:bcprov-jdk18on:1.78")
 
     implementation(files("libs/tron-wallet-1.0.jar"))
+
+    // gRPC dependencies for Tron (required by tron-wallet-1.0.jar)
+    implementation("io.grpc:grpc-netty:1.60.0")
+    implementation("io.grpc:grpc-protobuf:1.60.0")
+    implementation("io.grpc:grpc-stub:1.60.0")
+    implementation("com.google.protobuf:protobuf-java:3.25.5")
+
+    // Typesafe config (required by tron-wallet-1.0.jar crypto classes)
+    implementation("com.typesafe:config:1.3.2")
 
     // Testing
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
