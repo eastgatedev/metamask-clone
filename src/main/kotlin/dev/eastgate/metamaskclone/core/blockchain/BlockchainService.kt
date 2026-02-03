@@ -6,6 +6,7 @@ import dev.eastgate.metamaskclone.models.BlockchainType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import org.tron.common.utils.Base58
 import org.web3j.contracts.eip20.generated.ERC20
 import org.web3j.crypto.Credentials
 import org.web3j.crypto.RawTransaction
@@ -19,6 +20,7 @@ import org.web3j.utils.Convert
 import org.web3j.utils.Numeric
 import java.math.BigDecimal
 import java.math.BigInteger
+import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -79,11 +81,36 @@ class BlockchainService private constructor(private val project: Project) {
     }
 
     /**
-     * Validate TRON address format.
+     * Validate TRON address format with full Base58Check validation.
      * TRON addresses are Base58Check encoded, 34 characters, starting with 'T'.
      */
-    private fun isValidTronAddress(address: String): Boolean {
-        return address.startsWith("T") && address.length == 34
+    fun isValidTronAddress(address: String): Boolean {
+        // Quick format check
+        if (!address.startsWith("T") || address.length != 34) {
+            return false
+        }
+
+        // Full Base58Check validation with checksum verification
+        return try {
+            val decoded = Base58.decode(address)
+            if (decoded.size < 4) {
+                return false
+            }
+
+            // Split into address bytes and checksum
+            val addressBytes = decoded.copyOfRange(0, decoded.size - 4)
+            val checksum = decoded.copyOfRange(decoded.size - 4, decoded.size)
+
+            // Verify checksum = first 4 bytes of SHA256(SHA256(addressBytes))
+            val digest = MessageDigest.getInstance("SHA-256")
+            val hash1 = digest.digest(addressBytes)
+            val hash2 = digest.digest(hash1)
+            val expectedChecksum = hash2.copyOfRange(0, 4)
+
+            checksum.contentEquals(expectedChecksum)
+        } catch (e: Exception) {
+            false
+        }
     }
 
     /**
@@ -397,8 +424,36 @@ class BlockchainService private constructor(private val project: Project) {
         }
 
     /**
-     * Fetch ERC20 token balance for an address.
-     * Note: TRC20 tokens on TRON are not yet supported.
+     * Fetch TRC20 token metadata (symbol, name, decimals) from contract.
+     *
+     * @param contractAddress The TRC20 contract address (Base58Check format)
+     * @param network The TRON network where the token is deployed
+     */
+    suspend fun getTrc20TokenMetadata(
+        contractAddress: String,
+        network: Network
+    ): TokenMetadataResult =
+        withContext(Dispatchers.IO) {
+            try {
+                if (!isValidTronAddress(contractAddress)) {
+                    return@withContext TokenMetadataResult.Error("Invalid TRC20 contract address: $contractAddress")
+                }
+
+                val client = getTronClient(network)
+                val tokenInfo = client.getTrc20TokenInfo(contractAddress)
+
+                TokenMetadataResult.Success(
+                    symbol = tokenInfo.symbol,
+                    name = tokenInfo.name,
+                    decimals = tokenInfo.decimals
+                )
+            } catch (e: Exception) {
+                TokenMetadataResult.Error(e.message ?: "Failed to fetch TRC20 token metadata")
+            }
+        }
+
+    /**
+     * Fetch ERC20/TRC20 token balance for an address.
      *
      * @param contractAddress The token contract address
      * @param walletAddress The wallet address to check balance for
@@ -412,11 +467,32 @@ class BlockchainService private constructor(private val project: Project) {
         network: Network
     ): TokenBalanceResult =
         withContext(Dispatchers.IO) {
-            // TRC20 token balance fetching not implemented yet - return error for TRON
+            // Handle TRC20 tokens on TRON networks
             if (network.blockchainType == BlockchainType.TRON) {
-                return@withContext TokenBalanceResult.Error("TRC20 tokens not yet supported")
+                return@withContext try {
+                    if (!isValidTronAddress(contractAddress)) {
+                        return@withContext TokenBalanceResult.Error("Invalid TRC20 contract address: $contractAddress")
+                    }
+                    if (!isValidTronAddress(walletAddress)) {
+                        return@withContext TokenBalanceResult.Error("Invalid wallet address: $walletAddress")
+                    }
+
+                    val client = getTronClient(network)
+                    val balance = client.getTrc20Balance(walletAddress, contractAddress)
+
+                    // Convert to raw units for consistency with ERC20
+                    val balanceRaw = balance.multiply(BigDecimal.TEN.pow(decimals)).toBigInteger()
+
+                    TokenBalanceResult.Success(
+                        balanceRaw = balanceRaw,
+                        balanceFormatted = balance.stripTrailingZeros().toPlainString()
+                    )
+                } catch (e: Exception) {
+                    TokenBalanceResult.Error(e.message ?: "Failed to fetch TRC20 balance")
+                }
             }
 
+            // Handle ERC20 tokens on EVM networks
             try {
                 if (!isValidAddress(contractAddress)) {
                     return@withContext TokenBalanceResult.Error("Invalid contract address: $contractAddress")
@@ -515,6 +591,70 @@ class BlockchainService private constructor(private val project: Project) {
                 )
             } catch (e: Exception) {
                 TokenTransferResult.Error(e.message ?: "Token transfer failed")
+            }
+        }
+
+    /**
+     * Send TRC20 tokens to an address.
+     *
+     * @param contractAddress The TRC20 contract address
+     * @param fromAddress The sender's TRON address
+     * @param toAddress The recipient's TRON address
+     * @param amount Amount to send in token units (e.g., 10.5 for 10.5 tokens)
+     * @param privateKey The sender's private key (hex string)
+     * @param network The TRON network to send on
+     * @param feeLimit Maximum TRX to burn for energy (in SUN, default: 50 TRX = 50,000,000 SUN)
+     */
+    suspend fun sendTrc20Token(
+        contractAddress: String,
+        fromAddress: String,
+        toAddress: String,
+        amount: BigDecimal,
+        privateKey: String,
+        network: Network,
+        // 50 TRX in SUN
+        feeLimit: Long = 50_000_000L
+    ): TokenTransferResult =
+        withContext(Dispatchers.IO) {
+            try {
+                // Validate TRON addresses
+                if (!isValidTronAddress(contractAddress)) {
+                    return@withContext TokenTransferResult.Error("Invalid TRC20 contract address: $contractAddress")
+                }
+                if (!isValidTronAddress(fromAddress)) {
+                    return@withContext TokenTransferResult.Error("Invalid from address: $fromAddress")
+                }
+                if (!isValidTronAddress(toAddress)) {
+                    return@withContext TokenTransferResult.Error("Invalid to address: $toAddress")
+                }
+
+                val client = getTronClient(network)
+
+                // Strip 0x prefix if present
+                val cleanPrivateKey = if (privateKey.startsWith("0x")) {
+                    privateKey.substring(2)
+                } else {
+                    privateKey
+                }
+
+                val txId = client.sendTrc20(
+                    fromAddress = fromAddress,
+                    toAddress = toAddress,
+                    contractAddress = contractAddress,
+                    privateKey = cleanPrivateKey,
+                    amount = amount,
+                    feeLimit = feeLimit
+                )
+
+                // TRON uses different explorer URL format
+                val explorerUrl = network.blockExplorerUrl?.let { "$it/#/transaction/$txId" }
+
+                TokenTransferResult.Success(
+                    transactionHash = txId,
+                    explorerUrl = explorerUrl
+                )
+            } catch (e: Exception) {
+                TokenTransferResult.Error(e.message ?: "TRC20 transfer failed")
             }
         }
 

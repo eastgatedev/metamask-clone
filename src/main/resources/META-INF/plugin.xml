@@ -53,8 +53,8 @@
 
         <h2>Supported Networks</h2>
         <ul>
-            <li><strong>EVM Networks:</strong> Ethereum, BNB Smart Chain, Polygon</li>
-            <li><strong>TRON Network:</strong> TRON Mainnet, Shasta Testnet</li>
+            <li><strong>EVM Networks:</strong> Ethereum, BNB Smart Chain, Polygon (ERC20 tokens)</li>
+            <li><strong>TRON Network:</strong> TRON Mainnet, Shasta Testnet (TRC20 tokens)</li>
         </ul>
 
         <h2>Key Characteristics</h2>
@@ -169,6 +169,15 @@
 
     <change-notes>
     <![CDATA[
+    <h2>Version 1.3</h2>
+
+    <ul>
+      <li><strong>TRC20 Token Support:</strong> Import, view balance, and transfer TRC20 tokens</li>
+      <li>Auto-fetch TRC20 token metadata (symbol, name, decimals) from contract</li>
+      <li>Fee limit configuration for TRC20 transfers (energy cost control)</li>
+      <li>Full Base58Check validation for TRON addresses with checksum verification</li>
+    </ul>
+
     <h2>Version 1.2</h2>
 
     <ul>

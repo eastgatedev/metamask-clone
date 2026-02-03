@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "dev.eastgate.metamaskclone"
-version = "1.2"
+version = "1.3"
 
 configure<org.jlleitschuh.gradle.ktlint.KtlintExtension> {
     version.set("1.4.1")

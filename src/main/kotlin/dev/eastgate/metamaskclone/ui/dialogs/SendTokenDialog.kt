@@ -61,6 +61,10 @@ class SendTokenDialog(
     private lateinit var gasLimitLabel: JLabel
     private lateinit var gasPriceLabel: JLabel
 
+    // TRC20 fee limit UI components
+    private val feeLimitField = JBTextField("50")
+    private lateinit var feeLimitLabel: JLabel
+
     // Check if this is a TRON network
     private val isTronNetwork = network.blockchainType == BlockchainType.TRON
 
@@ -76,15 +80,13 @@ class SendTokenDialog(
         // Add native token option
         tokenSelector.addItem("${network.symbol} (Native Token)")
 
-        // Add available tokens (only for EVM networks - TRC20 not yet supported)
-        if (!isTronNetwork) {
-            for (t in availableTokens) {
-                tokenSelector.addItem("${t.symbol} - ${t.name}")
-            }
+        // Add available tokens (ERC20 for EVM, TRC20 for TRON)
+        for (t in availableTokens) {
+            tokenSelector.addItem("${t.symbol} - ${t.name}")
         }
 
-        // Select the provided token if any (only for EVM)
-        if (!isTronNetwork && token != null) {
+        // Select the provided token if any
+        if (token != null) {
             val index = availableTokens.indexOfFirst { it.id == token.id }
             if (index >= 0) {
                 tokenSelector.selectedIndex = index + 1 // +1 because of native token
@@ -130,15 +132,24 @@ class SendTokenDialog(
     }
 
     private fun onTokenSelectionChanged() {
-        if (tokenSelector.selectedIndex == 0) {
+        val isNativeToken = tokenSelector.selectedIndex == 0
+        val isTrc20Token = isTronNetwork && !isNativeToken
+
+        // Show/hide fee limit field for TRC20
+        feeLimitLabel.isVisible = isTrc20Token
+        feeLimitField.isVisible = isTrc20Token
+
+        if (isNativeToken) {
             // Native token selected
             if (!isTronNetwork) {
                 gasLimitField.text = "21000"
             }
             fetchBalance()
         } else {
-            // ERC20 token selected (only for EVM)
-            gasLimitField.text = "100000"
+            // Token selected (ERC20 or TRC20)
+            if (!isTronNetwork) {
+                gasLimitField.text = "100000"
+            }
             fetchTokenBalance()
         }
         updateTotalEstimate()
@@ -259,13 +270,31 @@ class SendTokenDialog(
     private fun updateTotalEstimate() {
         try {
             val amount = amountField.text.trim().toBigDecimalOrNull() ?: BigDecimal.ZERO
+            val isNativeToken = tokenSelector.selectedIndex == 0
+            val isTrc20Token = isTronNetwork && !isNativeToken
 
             if (isTronNetwork) {
-                // TRON: No gas fees, just show the amount
-                estimatedFeeLabel.text = "Free (uses bandwidth)"
-                estimatedFeeLabel.foreground = java.awt.Color(0x059669) // Green
-                val totalFormatted = amount.setScale(6, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString()
-                totalLabel.text = "$totalFormatted ${network.symbol}"
+                if (isTrc20Token) {
+                    // TRC20: Show fee limit info
+                    val feeLimit = feeLimitField.text.trim().toBigDecimalOrNull() ?: BigDecimal("50")
+                    estimatedFeeLabel.text = "Up to $feeLimit TRX (energy)"
+                    estimatedFeeLabel.foreground = java.awt.Color(0xF59E0B) // Amber
+                    // Get token symbol for display
+                    val tokenIndex = tokenSelector.selectedIndex - 1
+                    val tokenSymbol = if (tokenIndex >= 0 && tokenIndex < availableTokens.size) {
+                        availableTokens[tokenIndex].symbol
+                    } else {
+                        "tokens"
+                    }
+                    val totalFormatted = amount.setScale(6, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString()
+                    totalLabel.text = "$totalFormatted $tokenSymbol"
+                } else {
+                    // TRX native: Free bandwidth
+                    estimatedFeeLabel.text = "Free (uses bandwidth)"
+                    estimatedFeeLabel.foreground = java.awt.Color(0x059669) // Green
+                    val totalFormatted = amount.setScale(6, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString()
+                    totalLabel.text = "$totalFormatted ${network.symbol}"
+                }
                 totalLabel.font = totalLabel.font.deriveFont(java.awt.Font.BOLD)
             } else {
                 // EVM: Calculate gas fees
@@ -423,6 +452,23 @@ class SendTokenDialog(
         gasPriceField.toolTipText = "Gas price in Gwei"
         panel.add(gasPriceField, gbc)
 
+        // Fee Limit (TRC20 only)
+        row++
+        gbc.gridx = 0
+        gbc.gridy = row
+        gbc.weightx = 0.0
+        feeLimitLabel = JLabel("Fee Limit (TRX):")
+        panel.add(feeLimitLabel, gbc)
+
+        gbc.gridx = 1
+        gbc.weightx = 1.0
+        feeLimitField.toolTipText = "Maximum TRX to burn for energy (default: 50 TRX)"
+        panel.add(feeLimitField, gbc)
+
+        // Initially hide fee limit (shown only for TRC20 tokens)
+        feeLimitLabel.isVisible = false
+        feeLimitField.isVisible = false
+
         // Estimated fee
         row++
         gbc.gridx = 0
@@ -457,6 +503,7 @@ class SendTokenDialog(
         amountField.document.addDocumentListener(updateListener)
         gasLimitField.document.addDocumentListener(updateListener)
         gasPriceField.document.addDocumentListener(updateListener)
+        feeLimitField.document.addDocumentListener(updateListener)
 
         return panel
     }
@@ -601,42 +648,76 @@ class SendTokenDialog(
                                 proceedWithNativeTransaction(toAddress, amountValue, gasLimit, gasPriceWei)
                             }
                         } else {
-                            // ERC20 token: check gas fees only from native balance
-                            if (nativeBalanceResult.balanceWei < gasFeeWei) {
-                                val balanceFormatted = Convert.fromWei(BigDecimal(nativeBalanceResult.balanceWei), Convert.Unit.ETHER)
-                                val gasFee = Convert.fromWei(BigDecimal(gasFeeWei), Convert.Unit.ETHER)
+                            // Token transfer (ERC20 or TRC20)
+                            if (isTronNetwork) {
+                                // TRC20 token transfer
+                                // Check TRX balance for fees (recommend at least 1 TRX)
+                                val trxBalance = nativeBalanceResult.balanceWei // in SUN
+                                val minTrxRequired = BigInteger.valueOf(1_000_000L) // 1 TRX in SUN
+                                if (trxBalance < minTrxRequired) {
+                                    Messages.showWarningDialog(
+                                        project,
+                                        "Low TRX balance. TRC20 transfers require TRX for energy fees.\n\nCurrent TRX: ${nativeBalanceResult.balanceFormatted} TRX",
+                                        "Low TRX Balance"
+                                    )
+                                }
 
-                                Messages.showErrorDialog(
-                                    project,
-                                    """
-                                    Insufficient ${network.symbol} for gas fees.
+                                // Check token balance
+                                val tokenAmountRaw = amountValue.multiply(BigDecimal(BigInteger.TEN.pow(selectedToken!!.decimals))).toBigInteger()
+                                if (currentBalanceWei < tokenAmountRaw) {
+                                    Messages.showErrorDialog(
+                                        project,
+                                        """
+                                        Insufficient ${selectedToken.symbol} balance.
 
-                                    Your ${network.symbol} balance: $balanceFormatted
-                                    Estimated gas fee: $gasFee ${network.symbol}
-                                    """.trimIndent(),
-                                    "Insufficient Gas"
-                                )
-                                return@invokeLater
+                                        Your balance: ${balanceLabel.text}
+                                        Amount to send: $amountValue ${selectedToken.symbol}
+                                        """.trimIndent(),
+                                        "Insufficient Balance"
+                                    )
+                                    return@invokeLater
+                                }
+
+                                // Proceed with TRC20 transfer
+                                proceedWithTrc20TokenTransaction(selectedToken, toAddress, amountValue)
+                            } else {
+                                // ERC20 token: check gas fees only from native balance
+                                if (nativeBalanceResult.balanceWei < gasFeeWei) {
+                                    val balanceFormatted = Convert.fromWei(BigDecimal(nativeBalanceResult.balanceWei), Convert.Unit.ETHER)
+                                    val gasFee = Convert.fromWei(BigDecimal(gasFeeWei), Convert.Unit.ETHER)
+
+                                    Messages.showErrorDialog(
+                                        project,
+                                        """
+                                        Insufficient ${network.symbol} for gas fees.
+
+                                        Your ${network.symbol} balance: $balanceFormatted
+                                        Estimated gas fee: $gasFee ${network.symbol}
+                                        """.trimIndent(),
+                                        "Insufficient Gas"
+                                    )
+                                    return@invokeLater
+                                }
+
+                                // Check token balance (use stored balance or fetch again)
+                                val tokenAmountWei = amountValue.multiply(BigDecimal(BigInteger.TEN.pow(selectedToken!!.decimals))).toBigInteger()
+                                if (currentBalanceWei < tokenAmountWei) {
+                                    Messages.showErrorDialog(
+                                        project,
+                                        """
+                                        Insufficient ${selectedToken.symbol} balance.
+
+                                        Your balance: ${balanceLabel.text}
+                                        Amount to send: $amountValue ${selectedToken.symbol}
+                                        """.trimIndent(),
+                                        "Insufficient Balance"
+                                    )
+                                    return@invokeLater
+                                }
+
+                                // Balance is sufficient, proceed with ERC20 token transfer
+                                proceedWithTokenTransaction(selectedToken, toAddress, amountValue, gasLimit, gasPriceWei)
                             }
-
-                            // Check token balance (use stored balance or fetch again)
-                            val tokenAmountWei = amountValue.multiply(BigDecimal(BigInteger.TEN.pow(selectedToken!!.decimals))).toBigInteger()
-                            if (currentBalanceWei < tokenAmountWei) {
-                                Messages.showErrorDialog(
-                                    project,
-                                    """
-                                    Insufficient ${selectedToken.symbol} balance.
-
-                                    Your balance: ${balanceLabel.text}
-                                    Amount to send: $amountValue ${selectedToken.symbol}
-                                    """.trimIndent(),
-                                    "Insufficient Balance"
-                                )
-                                return@invokeLater
-                            }
-
-                            // Balance is sufficient, proceed with token transfer
-                            proceedWithTokenTransaction(selectedToken, toAddress, amountValue, gasLimit, gasPriceWei)
                         }
                     }
                     is BalanceResult.Error -> {
@@ -825,6 +906,102 @@ class SendTokenDialog(
                     }
                     is TransactionResult.Error -> {
                         Messages.showErrorDialog(project, "TRX transfer failed: ${result.message}", "Error")
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Handle TRC20 token transfer.
+     */
+    private fun proceedWithTrc20TokenTransaction(
+        token: Token,
+        toAddress: String,
+        amountValue: BigDecimal
+    ) {
+        // Request password for private key
+        val password = Messages.showPasswordDialog(
+            "Enter wallet password to sign transaction:",
+            "Sign Transaction"
+        )
+
+        if (password.isNullOrEmpty()) {
+            return
+        }
+
+        // Get private key
+        val privateKey: String
+        try {
+            privateKey = walletManager.exportPrivateKey(wallet.address, password)
+        } catch (e: Exception) {
+            Messages.showErrorDialog(project, "Invalid password or wallet error: ${e.message}", "Error")
+            return
+        }
+
+        // Get fee limit in SUN (1 TRX = 1,000,000 SUN)
+        val feeLimitTrx = feeLimitField.text.trim().toBigDecimalOrNull() ?: BigDecimal("50")
+        val feeLimitSun = feeLimitTrx.multiply(BigDecimal(1_000_000L)).toLong()
+
+        // Confirm transaction
+        val confirmMessage = """
+            Send $amountValue ${token.symbol} to:
+            $toAddress
+
+            Token Contract: ${token.contractAddress}
+            Fee Limit: $feeLimitTrx TRX (max energy cost)
+
+            Continue?
+        """.trimIndent()
+
+        val confirmed = Messages.showYesNoDialog(
+            project,
+            confirmMessage,
+            "Confirm TRC20 Transfer",
+            Messages.getQuestionIcon()
+        )
+
+        if (confirmed != Messages.YES) {
+            return
+        }
+
+        // Disable dialog while sending
+        isOKActionEnabled = false
+        rootPane?.cursor = Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR)
+
+        scope.launch {
+            val result = blockchainService.sendTrc20Token(
+                contractAddress = token.contractAddress,
+                fromAddress = wallet.address,
+                toAddress = toAddress,
+                amount = amountValue,
+                privateKey = privateKey,
+                network = network,
+                feeLimit = feeLimitSun
+            )
+
+            SwingUtilities.invokeLater {
+                rootPane?.cursor = Cursor.getDefaultCursor()
+                isOKActionEnabled = true
+
+                when (result) {
+                    is TokenTransferResult.Success -> {
+                        val message = buildString {
+                            append("TRC20 transfer sent successfully!\n\n")
+                            append("Transaction ID:\n${result.transactionHash}\n\n")
+                            result.explorerUrl?.let {
+                                append("View on TronScan:\n$it")
+                            }
+                        }
+                        Messages.showInfoMessage(project, message, "TRC20 Transfer Sent")
+
+                        // Copy tx hash to clipboard
+                        ClipboardUtil.copyToClipboard(result.transactionHash)
+
+                        super.doOKAction()
+                    }
+                    is TokenTransferResult.Error -> {
+                        Messages.showErrorDialog(project, "TRC20 transfer failed: ${result.message}", "Error")
                     }
                 }
             }

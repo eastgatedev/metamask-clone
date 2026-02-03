@@ -8,6 +8,7 @@ import com.intellij.ui.components.JBTextField
 import dev.eastgate.metamaskclone.core.blockchain.BlockchainService
 import dev.eastgate.metamaskclone.core.blockchain.TokenMetadataResult
 import dev.eastgate.metamaskclone.core.storage.Network
+import dev.eastgate.metamaskclone.models.BlockchainType
 import dev.eastgate.metamaskclone.models.Token
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -43,6 +44,7 @@ class AddTokenDialog(
         private set
 
     private val isEditMode = existingToken != null
+    private val isTronNetwork = network.blockchainType == BlockchainType.TRON
 
     init {
         title = if (isEditMode) "Edit Token" else "Add Token"
@@ -76,7 +78,11 @@ class AddTokenDialog(
         gbc.gridx = 1
         gbc.weightx = 1.0
         contractAddressField.columns = 30
-        contractAddressField.toolTipText = "Token contract address (0x...)"
+        contractAddressField.toolTipText = if (isTronNetwork) {
+            "TRC20 token contract address (T...)"
+        } else {
+            "Token contract address (0x...)"
+        }
         contractAddressField.isEditable = !isEditMode
         panel.add(contractAddressField, gbc)
 
@@ -149,10 +155,19 @@ class AddTokenDialog(
             return
         }
 
-        if (!contractAddress.startsWith("0x") || contractAddress.length != 42) {
-            statusLabel.foreground = JBColor.RED
-            statusLabel.text = "Invalid address format"
-            return
+        // Validate based on network type
+        if (isTronNetwork) {
+            if (!blockchainService.isValidTronAddress(contractAddress)) {
+                statusLabel.foreground = JBColor.RED
+                statusLabel.text = "Invalid TRON address format (must start with T, 34 chars)"
+                return
+            }
+        } else {
+            if (!contractAddress.startsWith("0x") || contractAddress.length != 42) {
+                statusLabel.foreground = JBColor.RED
+                statusLabel.text = "Invalid address format"
+                return
+            }
         }
 
         // Start fetching
@@ -161,7 +176,11 @@ class AddTokenDialog(
         statusLabel.text = "Fetching token info..."
 
         scope.launch {
-            val result = blockchainService.getTokenMetadata(contractAddress, network)
+            val result = if (isTronNetwork) {
+                blockchainService.getTrc20TokenMetadata(contractAddress, network)
+            } else {
+                blockchainService.getTokenMetadata(contractAddress, network)
+            }
 
             SwingUtilities.invokeLater {
                 when (result) {
@@ -194,9 +213,23 @@ class AddTokenDialog(
             return
         }
 
-        if (!contractAddress.startsWith("0x") || contractAddress.length != 42) {
-            Messages.showErrorDialog("Invalid contract address format. Must be a 42-character hex address starting with 0x", "Validation Error")
-            return
+        // Validate based on network type
+        if (isTronNetwork) {
+            if (!blockchainService.isValidTronAddress(contractAddress)) {
+                Messages.showErrorDialog(
+                    "Invalid TRON contract address format. Must be a 34-character address starting with T",
+                    "Validation Error"
+                )
+                return
+            }
+        } else {
+            if (!contractAddress.startsWith("0x") || contractAddress.length != 42) {
+                Messages.showErrorDialog(
+                    "Invalid contract address format. Must be a 42-character hex address starting with 0x",
+                    "Validation Error"
+                )
+                return
+            }
         }
 
         if (symbol.isEmpty()) {
