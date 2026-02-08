@@ -25,6 +25,7 @@ class CreateWalletDialog(
         title = when (blockchainType) {
             BlockchainType.EVM -> "Create New Wallet"
             BlockchainType.TRON -> "Create New TRON Wallet"
+            BlockchainType.BITCOIN -> "Bitcoin Core Wallet"
         }
         init()
     }
@@ -46,6 +47,7 @@ class CreateWalletDialog(
         nameField.text = when (blockchainType) {
             BlockchainType.EVM -> "Wallet ${walletCount + 1}"
             BlockchainType.TRON -> "TRON Wallet ${walletCount + 1}"
+            BlockchainType.BITCOIN -> "Bitcoin Core Wallet"
         }
         panel.add(nameField, gbc)
 
@@ -109,6 +111,7 @@ class CreateWalletDialog(
             val addressLabel = when (blockchainType) {
                 BlockchainType.EVM -> "Address"
                 BlockchainType.TRON -> "TRON Address"
+                BlockchainType.BITCOIN -> "Bitcoin Address"
             }
             Messages.showInfoMessage(
                 "Wallet created successfully!\n$addressLabel: ${wallet.address}",

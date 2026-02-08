@@ -6,8 +6,10 @@ import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.util.ui.JBUI
+import dev.eastgate.metamaskclone.core.blockchain.BlockchainService
 import dev.eastgate.metamaskclone.core.network.NetworkManager
 import dev.eastgate.metamaskclone.core.storage.Network
+import dev.eastgate.metamaskclone.models.BlockchainType
 import java.awt.*
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
@@ -167,6 +169,13 @@ class NetworkSelectionDialog(
             addButton.font = addButton.font.deriveFont(Font.PLAIN, 11f)
             addButton.addActionListener {
                 networkManager.enableNetwork(network.id)
+                // For Bitcoin networks, immediately prompt RPC config
+                if (network.blockchainType == BlockchainType.BITCOIN) {
+                    val configDialog = BitcoinRpcConfigDialog(project, networkManager, network)
+                    if (configDialog.showAndGet()) {
+                        BlockchainService.getInstance(project).invalidateNetwork(network.id)
+                    }
+                }
                 refreshNetworkList()
             }
             rightPanel.add(addButton)
@@ -226,6 +235,20 @@ class NetworkSelectionDialog(
             }
             popup.add(removeItem)
         } else {
+            // Add "Configure RPC" for predefined Bitcoin networks
+            if (network.blockchainType == BlockchainType.BITCOIN) {
+                val configureItem = JMenuItem("Configure RPC")
+                configureItem.addActionListener {
+                    val configDialog = BitcoinRpcConfigDialog(project, networkManager, network)
+                    if (configDialog.showAndGet()) {
+                        // Invalidate cached client so it reconnects with new credentials
+                        BlockchainService.getInstance(project).invalidateNetwork(network.id)
+                        refreshNetworkList()
+                    }
+                }
+                popup.add(configureItem)
+            }
+
             val disableItem = JMenuItem("Disable")
             disableItem.isEnabled = networkManager.selectedNetwork.value.id != network.id
             disableItem.addActionListener {

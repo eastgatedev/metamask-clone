@@ -95,6 +95,43 @@ object PredefinedNetworks {
         blockchainType = BlockchainType.TRON
     )
 
+    // Bitcoin Networks (chainId = -1, connects to Bitcoin Core RPC)
+    val BTC_MAINNET = Network(
+        id = "BTC_MAINNET",
+        name = "Bitcoin Mainnet",
+        rpcUrl = "http://user:pass@127.0.0.1:8332",
+        chainId = -1,
+        symbol = "BTC",
+        blockExplorerUrl = "https://blockstream.info",
+        isTestnet = false,
+        isCustom = false,
+        blockchainType = BlockchainType.BITCOIN
+    )
+
+    val BTC_TESTNET = Network(
+        id = "BTC_TESTNET",
+        name = "Bitcoin Testnet",
+        rpcUrl = "http://user:pass@127.0.0.1:18332",
+        chainId = -1,
+        symbol = "tBTC",
+        blockExplorerUrl = "https://blockstream.info/testnet",
+        isTestnet = true,
+        isCustom = false,
+        blockchainType = BlockchainType.BITCOIN
+    )
+
+    val BTC_REGTEST = Network(
+        id = "BTC_REGTEST",
+        name = "Bitcoin Regtest",
+        rpcUrl = "http://user:pass@127.0.0.1:18443",
+        chainId = -1,
+        symbol = "BTC",
+        blockExplorerUrl = "",
+        isTestnet = true,
+        isCustom = false,
+        blockchainType = BlockchainType.BITCOIN
+    )
+
     val ALL_NETWORKS = listOf(
         BNB_TESTNET, // Default first
         BNB_MAINNET,
@@ -103,13 +140,16 @@ object PredefinedNetworks {
         POLYGON_TESTNET,
         POLYGON_MAINNET,
         TRON_SHASTA,
-        TRON_MAINNET
+        TRON_MAINNET,
+        BTC_REGTEST,
+        BTC_TESTNET,
+        BTC_MAINNET
     )
 
     val TESTNET_NETWORKS = ALL_NETWORKS.filter { it.isTestnet }
     val MAINNET_NETWORKS = ALL_NETWORKS.filter { !it.isTestnet }
 
-    val DEFAULT_ENABLED_IDS = listOf("BNB_TESTNET", "ETH_SEPOLIA", "POLYGON_TESTNET", "TRON_SHASTA")
+    val DEFAULT_ENABLED_IDS = listOf("BNB_TESTNET", "ETH_SEPOLIA", "POLYGON_TESTNET", "TRON_SHASTA", "BTC_REGTEST")
 
     fun getNetworkById(id: String): Network? {
         return ALL_NETWORKS.find { it.id == id }

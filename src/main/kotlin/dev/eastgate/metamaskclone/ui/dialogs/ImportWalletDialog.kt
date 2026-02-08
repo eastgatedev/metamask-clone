@@ -27,6 +27,7 @@ class ImportWalletDialog(
         title = when (blockchainType) {
             BlockchainType.EVM -> "Import Wallet"
             BlockchainType.TRON -> "Import TRON Wallet"
+            BlockchainType.BITCOIN -> "Bitcoin Core Wallet"
         }
         init()
     }
@@ -47,6 +48,7 @@ class ImportWalletDialog(
         nameField.text = when (blockchainType) {
             BlockchainType.EVM -> "Imported Wallet"
             BlockchainType.TRON -> "Imported TRON Wallet"
+            BlockchainType.BITCOIN -> "Bitcoin Core Wallet"
         }
         panel.add(nameField, gbc)
 
@@ -91,6 +93,7 @@ class ImportWalletDialog(
         val noteText = when (blockchainType) {
             BlockchainType.EVM -> "⚠️ Never share your private key with anyone!"
             BlockchainType.TRON -> "⚠️ Never share your private key! TRON uses the same key format as EVM."
+            BlockchainType.BITCOIN -> "⚠️ Bitcoin keys are managed by Bitcoin Core."
         }
         val noteLabel = JLabel("<html><small>$noteText</small></html>")
         panel.add(noteLabel, gbc)

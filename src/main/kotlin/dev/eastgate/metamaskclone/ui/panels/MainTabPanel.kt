@@ -157,4 +157,66 @@ class MainTabPanel : JPanel() {
     }
 
     fun getTokenListPanel(): TokenListPanel = tokenListPanel
+
+    /**
+     * Replace Activity tab content with a Bitcoin activity panel.
+     */
+    fun replacePlaceholderWithBitcoin(panel: JPanel) {
+        // Remove existing activity panel from card layout
+        contentPanel.remove(activityPanel)
+        contentPanel.add(panel, "Activity")
+        if (selectedTab == "Activity") {
+            val cardLayout = contentPanel.layout as CardLayout
+            cardLayout.show(contentPanel, "Activity")
+        }
+        contentPanel.revalidate()
+        contentPanel.repaint()
+    }
+
+    /**
+     * Restore original Activity tab placeholder.
+     */
+    fun restorePlaceholder() {
+        // Remove all non-token panels and re-add the default placeholder
+        val componentsToRemove = contentPanel.components.filter { it !== tokenListPanel }
+        componentsToRemove.forEach { contentPanel.remove(it) }
+        val newPlaceholder = createActivityPlaceholder()
+        contentPanel.add(newPlaceholder, "Activity")
+        if (selectedTab == "Activity") {
+            val cardLayout = contentPanel.layout as CardLayout
+            cardLayout.show(contentPanel, "Activity")
+        }
+        contentPanel.revalidate()
+        contentPanel.repaint()
+    }
+
+    /**
+     * Hide the "Add Token" button (for Bitcoin mode).
+     */
+    fun hideTokenAddButton() {
+        tokenListPanel.setAddTokenVisible(false)
+    }
+
+    /**
+     * Show the "Add Token" button (for standard mode).
+     */
+    fun showTokenAddButton() {
+        tokenListPanel.setAddTokenVisible(true)
+    }
+
+    /**
+     * Switch to Bitcoin mode: hide Tokens tab, show only Activity tab.
+     */
+    fun showBitcoinTabs() {
+        tokensTab.isVisible = false
+        selectTab("Activity")
+    }
+
+    /**
+     * Restore standard mode: show both Tokens and Activity tabs.
+     */
+    fun showStandardTabs() {
+        tokensTab.isVisible = true
+        selectTab("Tokens")
+    }
 }

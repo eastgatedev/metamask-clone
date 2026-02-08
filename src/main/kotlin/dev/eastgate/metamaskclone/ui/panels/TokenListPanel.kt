@@ -26,6 +26,7 @@ class TokenListPanel : JPanel() {
     var onDeleteToken: ((Token) -> Unit)? = null
 
     private val tokenListContainer = JPanel()
+    private lateinit var addTokenButtonPanel: JPanel
     private var tokens: List<Token> = emptyList()
 
     init {
@@ -50,11 +51,11 @@ class TokenListPanel : JPanel() {
             onAddTokenClick?.invoke()
         }
 
-        val buttonPanel = JPanel(FlowLayout(FlowLayout.LEFT, 0, 8))
-        buttonPanel.add(addTokenButton)
+        addTokenButtonPanel = JPanel(FlowLayout(FlowLayout.LEFT, 0, 8))
+        addTokenButtonPanel.add(addTokenButton)
 
         add(scrollPane, BorderLayout.CENTER)
-        add(buttonPanel, BorderLayout.SOUTH)
+        add(addTokenButtonPanel, BorderLayout.SOUTH)
 
         // Default empty state
         updateTokens(emptyList())
@@ -172,4 +173,8 @@ class TokenListPanel : JPanel() {
     }
 
     fun getTokens(): List<Token> = tokens
+
+    fun setAddTokenVisible(visible: Boolean) {
+        addTokenButtonPanel.isVisible = visible
+    }
 }

@@ -9,6 +9,16 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 class WalletManager(private val project: Project) {
+    companion object {
+        const val BITCOIN_CORE_ADDRESS = "BITCOIN_CORE_CONNECTION"
+
+        private val instances = mutableMapOf<Project, WalletManager>()
+
+        fun getInstance(project: Project): WalletManager {
+            return instances.getOrPut(project) { WalletManager(project) }
+        }
+    }
+
     private val walletGenerator = WalletGenerator()
     private val tronWalletGenerator = TronWalletGenerator()
     private val storage = ProjectStorage.getInstance(project)
@@ -57,15 +67,21 @@ class WalletManager(private val project: Project) {
         password: String,
         blockchainType: BlockchainType = BlockchainType.EVM
     ): Wallet {
+        if (blockchainType == BlockchainType.BITCOIN) {
+            throw IllegalArgumentException("Bitcoin wallets are managed by Bitcoin Core. Use ensureBitcoinCoreWallet() instead.")
+        }
+
         val walletCount = getWalletCountForType(blockchainType)
         val walletName = name ?: when (blockchainType) {
             BlockchainType.EVM -> walletGenerator.generateWalletName(walletCount)
             BlockchainType.TRON -> tronWalletGenerator.generateWalletName(walletCount)
+            BlockchainType.BITCOIN -> throw IllegalStateException("Unreachable")
         }
 
         val wallet = when (blockchainType) {
             BlockchainType.EVM -> walletGenerator.generateNewWallet(walletName, password)
             BlockchainType.TRON -> tronWalletGenerator.generateNewWallet(walletName, password)
+            BlockchainType.BITCOIN -> throw IllegalStateException("Unreachable")
         }
 
         val updatedWallets = _wallets.value + wallet
@@ -88,14 +104,20 @@ class WalletManager(private val project: Project) {
         password: String,
         blockchainType: BlockchainType = BlockchainType.EVM
     ): Wallet {
+        if (blockchainType == BlockchainType.BITCOIN) {
+            throw IllegalArgumentException("Bitcoin wallets are managed by Bitcoin Core. Import keys directly in Bitcoin Core.")
+        }
+
         val walletName = name ?: when (blockchainType) {
             BlockchainType.EVM -> "Imported Wallet"
             BlockchainType.TRON -> "Imported TRON Wallet"
+            BlockchainType.BITCOIN -> throw IllegalStateException("Unreachable")
         }
 
         val wallet = when (blockchainType) {
             BlockchainType.EVM -> walletGenerator.importWalletFromPrivateKey(privateKey, walletName, password)
             BlockchainType.TRON -> tronWalletGenerator.importWalletFromPrivateKey(privateKey, walletName, password)
+            BlockchainType.BITCOIN -> throw IllegalStateException("Unreachable")
         }
 
         // Check if wallet already exists (same address AND same blockchain type)
@@ -145,6 +167,10 @@ class WalletManager(private val project: Project) {
     }
 
     fun deleteWallet(address: String) {
+        if (address == BITCOIN_CORE_ADDRESS) {
+            throw IllegalArgumentException("Cannot delete Bitcoin Core pseudo-wallet")
+        }
+
         val walletToDelete = _wallets.value.find {
             it.address.equals(address, ignoreCase = true)
         }
@@ -180,6 +206,10 @@ class WalletManager(private val project: Project) {
         address: String,
         password: String
     ): String {
+        if (address == BITCOIN_CORE_ADDRESS) {
+            throw IllegalArgumentException("Bitcoin private keys are managed by Bitcoin Core. Export keys using bitcoin-cli.")
+        }
+
         val wallet = _wallets.value.find {
             it.address.equals(address, ignoreCase = true)
         } ?: throw IllegalArgumentException("Wallet not found")
@@ -187,6 +217,7 @@ class WalletManager(private val project: Project) {
         return when (wallet.blockchainType) {
             BlockchainType.EVM -> walletGenerator.decryptPrivateKey(wallet.encryptedPrivateKey, password)
             BlockchainType.TRON -> tronWalletGenerator.decryptPrivateKey(wallet.encryptedPrivateKey, password)
+            BlockchainType.BITCOIN -> throw IllegalArgumentException("Bitcoin private keys are managed by Bitcoin Core")
         }
     }
 
@@ -200,11 +231,38 @@ class WalletManager(private val project: Project) {
         return _wallets.value.isNotEmpty()
     }
 
-    companion object {
-        private val instances = mutableMapOf<Project, WalletManager>()
+    // ==================== Bitcoin Core Pseudo-Wallet ====================
 
-        fun getInstance(project: Project): WalletManager {
-            return instances.getOrPut(project) { WalletManager(project) }
+    /**
+     * Ensure a Bitcoin Core pseudo-wallet exists.
+     * Bitcoin Core manages keys server-side, so we create a placeholder wallet
+     * to fit existing architecture.
+     */
+    fun ensureBitcoinCoreWallet(): Wallet {
+        val existing = _wallets.value.find {
+            it.address == BITCOIN_CORE_ADDRESS && it.blockchainType == BlockchainType.BITCOIN
         }
+        if (existing != null) return existing
+
+        val wallet = Wallet(
+            name = "Bitcoin Core Wallet",
+            address = BITCOIN_CORE_ADDRESS,
+            encryptedPrivateKey = "",
+            publicKey = "",
+            blockchainType = BlockchainType.BITCOIN
+        )
+
+        val updatedWallets = _wallets.value + wallet
+        _wallets.value = updatedWallets
+        storage.saveWallets(updatedWallets)
+
+        return wallet
+    }
+
+    /**
+     * Check if a wallet is the Bitcoin Core pseudo-wallet.
+     */
+    fun isBitcoinCoreWallet(wallet: Wallet): Boolean {
+        return wallet.address == BITCOIN_CORE_ADDRESS && wallet.blockchainType == BlockchainType.BITCOIN
     }
 }

@@ -30,7 +30,8 @@ class ProjectStorage : PersistentStateComponent<ProjectStorage.State> {
         var enabledNetworkIds: String = "[\"BNB_TESTNET\", \"ETH_SEPOLIA\", \"POLYGON_TESTNET\"]",
         var tokens: String = "[]",
         var encryptedMasterPassword: String? = null,
-        var settings: String = "{}"
+        var settings: String = "{}",
+        var bitcoinRpcConfigs: String = "{}"
     )
 
     private var myState = State()
@@ -117,6 +118,31 @@ class ProjectStorage : PersistentStateComponent<ProjectStorage.State> {
 
     fun saveSettings(settings: Map<String, String>) {
         myState.settings = json.encodeToString(settings)
+    }
+
+    fun getBitcoinRpcConfigs(): Map<String, String> {
+        return try {
+            json.decodeFromString(myState.bitcoinRpcConfigs)
+        } catch (e: Exception) {
+            emptyMap()
+        }
+    }
+
+    fun saveBitcoinRpcConfigs(configs: Map<String, String>) {
+        myState.bitcoinRpcConfigs = json.encodeToString(configs)
+    }
+
+    fun getBitcoinRpcUrl(networkId: String): String? {
+        return getBitcoinRpcConfigs()[networkId]
+    }
+
+    fun setBitcoinRpcUrl(
+        networkId: String,
+        rpcUrl: String
+    ) {
+        val configs = getBitcoinRpcConfigs().toMutableMap()
+        configs[networkId] = rpcUrl
+        saveBitcoinRpcConfigs(configs)
     }
 
     fun clearAllData() {

@@ -37,6 +37,7 @@ class ReceiveDialog(
         val titleText = when (wallet.blockchainType) {
             BlockchainType.EVM -> "Your Address"
             BlockchainType.TRON -> "Your TRON Address"
+            BlockchainType.BITCOIN -> "Your Bitcoin Address"
         }
         val titleLabel = JBLabel(titleText)
         titleLabel.font = titleLabel.font.deriveFont(Font.BOLD, 16f)
@@ -77,6 +78,7 @@ class ReceiveDialog(
         val warningText = when (wallet.blockchainType) {
             BlockchainType.EVM -> "Only send tokens on the same EVM network.<br/>Sending to wrong network may result in loss."
             BlockchainType.TRON -> "Only send TRX and TRC tokens to this address.<br/>Do not send EVM tokens to this address."
+            BlockchainType.BITCOIN -> "Only send BTC to this address.<br/>Do not send other cryptocurrency to this address."
         }
         val warningLabel =
             JBLabel("<html><center><small>$warningText</small></center></html>")

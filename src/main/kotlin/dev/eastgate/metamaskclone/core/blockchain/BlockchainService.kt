@@ -1,6 +1,7 @@
 package dev.eastgate.metamaskclone.core.blockchain
 
 import com.intellij.openapi.project.Project
+import dev.eastgate.metamaskclone.core.network.NetworkManager
 import dev.eastgate.metamaskclone.core.storage.Network
 import dev.eastgate.metamaskclone.models.BlockchainType
 import kotlinx.coroutines.Dispatchers
@@ -29,8 +30,10 @@ import java.util.concurrent.ConcurrentHashMap
  * for both EVM and TRON networks.
  */
 class BlockchainService private constructor(private val project: Project) {
+    private val networkManager = NetworkManager.getInstance(project)
     private val web3jInstances = ConcurrentHashMap<String, Web3j>()
     private val tronClients = ConcurrentHashMap<String, TronGrpcClient>()
+    private val bitcoinClients = ConcurrentHashMap<String, BitcoinRpcClient>()
 
     companion object {
         private val instances = ConcurrentHashMap<Project, BlockchainService>()
@@ -67,6 +70,17 @@ class BlockchainService private constructor(private val project: Project) {
                 "TRON_SHASTA" -> TronGrpcClient.ofShasta()
                 else -> throw IllegalStateException("Unknown TRON network: ${network.id}")
             }
+        }
+    }
+
+    /**
+     * Get or create BitcoinRpcClient instance for a Bitcoin network.
+     * Uses the effective RPC URL from NetworkManager (user-configured override or predefined default).
+     * Instances are cached per network ID.
+     */
+    private fun getBitcoinClient(network: Network): BitcoinRpcClient {
+        return bitcoinClients.computeIfAbsent(network.id) {
+            BitcoinRpcClient(networkManager.getEffectiveRpcUrl(network))
         }
     }
 
@@ -136,6 +150,25 @@ class BlockchainService private constructor(private val project: Project) {
                     )
                 } catch (e: Exception) {
                     BalanceResult.Error(e.message ?: "Failed to fetch TRX balance")
+                }
+            }
+
+            // Handle Bitcoin networks using BitcoinRpcClient
+            if (network.blockchainType == BlockchainType.BITCOIN) {
+                return@withContext try {
+                    val client = getBitcoinClient(network)
+                    val balanceBtc = client.getBalance()
+                    // Convert BTC to satoshis (1 BTC = 100,000,000 satoshis)
+                    val balanceSatoshis = BigDecimal.valueOf(balanceBtc)
+                        .multiply(BigDecimal(100_000_000L))
+                        .toBigInteger()
+                    BalanceResult.Success(
+                        balanceWei = balanceSatoshis, // Using balanceWei field for satoshis
+                        balanceFormatted = BigDecimal.valueOf(balanceBtc).stripTrailingZeros().toPlainString(),
+                        symbol = network.symbol
+                    )
+                } catch (e: Exception) {
+                    BalanceResult.Error(e.message ?: "Failed to fetch BTC balance")
                 }
             }
 
@@ -658,24 +691,112 @@ class BlockchainService private constructor(private val project: Project) {
             }
         }
 
+    // ==================== Bitcoin Methods ====================
+
+    /**
+     * Send BTC to an address via Bitcoin Core.
+     * On regtest, automatically sets a fee rate before sending.
+     *
+     * @param toAddress Recipient Bitcoin address
+     * @param amount Amount in BTC
+     * @param network The Bitcoin network
+     */
+    suspend fun sendBitcoin(
+        toAddress: String,
+        amount: Double,
+        network: Network
+    ): TransactionResult =
+        withContext(Dispatchers.IO) {
+            try {
+                val client = getBitcoinClient(network)
+
+                // On regtest, fee estimation has no data — set a manual fee
+                if (network.id == "BTC_REGTEST") {
+                    client.setTxFee(0.00001)
+                }
+
+                val txid = client.sendToAddress(toAddress, amount)
+                val explorerUrl = network.blockExplorerUrl?.takeIf { it.isNotEmpty() }
+                    ?.let { "$it/tx/$txid" }
+
+                TransactionResult.Success(
+                    transactionHash = txid,
+                    explorerUrl = explorerUrl
+                )
+            } catch (e: Exception) {
+                TransactionResult.Error(e.message ?: "Bitcoin send failed")
+            }
+        }
+
+    /**
+     * Get all receiving addresses from Bitcoin Core wallet.
+     */
+    suspend fun getBitcoinAddresses(network: Network): BitcoinAddressesResult =
+        withContext(Dispatchers.IO) {
+            try {
+                val client = getBitcoinClient(network)
+                val addresses = client.getAllAddresses()
+                BitcoinAddressesResult.Success(addresses)
+            } catch (e: Exception) {
+                BitcoinAddressesResult.Error(e.message ?: "Failed to fetch Bitcoin addresses")
+            }
+        }
+
+    /**
+     * Generate a new receiving address in Bitcoin Core wallet.
+     */
+    suspend fun generateBitcoinAddress(network: Network): BitcoinAddressResult =
+        withContext(Dispatchers.IO) {
+            try {
+                val client = getBitcoinClient(network)
+                val address = client.generateNewAddress()
+                BitcoinAddressResult.Success(address)
+            } catch (e: Exception) {
+                BitcoinAddressResult.Error(e.message ?: "Failed to generate Bitcoin address")
+            }
+        }
+
+    /**
+     * Get recent transactions from Bitcoin Core wallet.
+     *
+     * @param network The Bitcoin network
+     * @param count Number of transactions to return
+     */
+    suspend fun getBitcoinTransactions(
+        network: Network,
+        count: Int = 20
+    ): BitcoinTransactionsResult =
+        withContext(Dispatchers.IO) {
+            try {
+                val client = getBitcoinClient(network)
+                val transactions = client.listTransactions(count)
+                BitcoinTransactionsResult.Success(transactions)
+            } catch (e: Exception) {
+                BitcoinTransactionsResult.Error(e.message ?: "Failed to fetch Bitcoin transactions")
+            }
+        }
+
     /**
      * Invalidate cached client instance for a network.
      * Useful when network RPC URL changes.
-     * Handles both Web3j (EVM) and TronGrpcClient (TRON) instances.
+     * Handles Web3j (EVM), TronGrpcClient (TRON), and BitcoinRpcClient (Bitcoin) instances.
      */
     fun invalidateNetwork(networkId: String) {
         web3jInstances.remove(networkId)?.shutdown()
         tronClients.remove(networkId)?.close()
+        bitcoinClients.remove(networkId)?.close()
     }
 
     /**
-     * Clean up all client instances (Web3j and TronGrpcClient).
+     * Clean up all client instances (Web3j, TronGrpcClient, and BitcoinRpcClient).
      */
     fun shutdown() {
         web3jInstances.values.forEach { it.shutdown() }
         web3jInstances.clear()
         tronClients.values.forEach { it.close() }
         tronClients.clear()
+        bitcoinClients.values.forEach { it.close() }
+        bitcoinClients.clear()
     }
 }
 
@@ -749,4 +870,21 @@ sealed class TokenTransferResult {
     ) : TokenTransferResult()
 
     data class Error(val message: String) : TokenTransferResult()
+}
+
+// Bitcoin Result Classes
+
+sealed class BitcoinAddressesResult {
+    data class Success(val addresses: List<String>) : BitcoinAddressesResult()
+    data class Error(val message: String) : BitcoinAddressesResult()
+}
+
+sealed class BitcoinAddressResult {
+    data class Success(val address: String) : BitcoinAddressResult()
+    data class Error(val message: String) : BitcoinAddressResult()
+}
+
+sealed class BitcoinTransactionsResult {
+    data class Success(val transactions: List<BitcoinTransaction>) : BitcoinTransactionsResult()
+    data class Error(val message: String) : BitcoinTransactionsResult()
 }

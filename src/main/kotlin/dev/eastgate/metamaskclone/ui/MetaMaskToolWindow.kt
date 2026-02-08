@@ -6,6 +6,8 @@ import com.intellij.openapi.ui.SimpleToolWindowPanel
 import com.intellij.ui.components.JBLabel
 import com.intellij.util.ui.JBUI
 import dev.eastgate.metamaskclone.core.blockchain.BalanceResult
+import dev.eastgate.metamaskclone.core.blockchain.BitcoinAddressesResult
+import dev.eastgate.metamaskclone.core.blockchain.BitcoinTransactionsResult
 import dev.eastgate.metamaskclone.core.blockchain.BlockchainService
 import dev.eastgate.metamaskclone.core.blockchain.TokenBalanceResult
 import dev.eastgate.metamaskclone.core.network.NetworkManager
@@ -37,8 +39,14 @@ class MetaMaskToolWindow(private val project: Project) {
     private val actionButtonsRow = ActionButtonsRow()
     private val mainTabPanel = MainTabPanel()
 
+    // Bitcoin UI components
+    private val bitcoinAddressesPanel = BitcoinAddressesPanel()
+    private val bitcoinActivityPanel = BitcoinActivityPanel()
+
     // State
     private var tokens: MutableList<Token> = mutableListOf()
+    private var isBitcoinMode = false
+    private lateinit var headerPanel: JPanel
 
     init {
         loadTokens()
@@ -58,7 +66,7 @@ class MetaMaskToolWindow(private val project: Project) {
         mainPanel.border = BorderFactory.createEmptyBorder(10, 10, 10, 10)
 
         // Header section (Title + Network + Wallet)
-        val headerPanel = JPanel()
+        headerPanel = JPanel()
         headerPanel.layout = BoxLayout(headerPanel, BoxLayout.Y_AXIS)
 
         // Title
@@ -100,6 +108,14 @@ class MetaMaskToolWindow(private val project: Project) {
             networkManager.selectedNetwork.collect { network ->
                 SwingUtilities.invokeLater {
                     networkSelectorBar.updateNetwork(network)
+
+                    // Switch UI mode based on blockchain type
+                    if (network.blockchainType == BlockchainType.BITCOIN) {
+                        showBitcoinUI()
+                    } else {
+                        showStandardUI()
+                    }
+
                     // Select appropriate wallet for this blockchain type
                     selectWalletForCurrentBlockchainType()
                     updateBalanceDisplay()
@@ -293,6 +309,132 @@ class MetaMaskToolWindow(private val project: Project) {
         }
     }
 
+    // ==================== Bitcoin UI Switching ====================
+
+    private fun showBitcoinUI() {
+        if (isBitcoinMode) return
+        isBitcoinMode = true
+
+        // Ensure Bitcoin pseudo-wallet exists and select it
+        val bitcoinWallet = walletManager.ensureBitcoinCoreWallet()
+        walletManager.selectWallet(bitcoinWallet.address)
+
+        // Replace wallet selector with Bitcoin addresses panel in header
+        headerPanel.remove(walletSelectorBar)
+        headerPanel.add(bitcoinAddressesPanel)
+
+        // Replace Activity tab with Bitcoin activity panel, hide Tokens tab
+        mainTabPanel.replacePlaceholderWithBitcoin(bitcoinActivityPanel)
+        mainTabPanel.hideTokenAddButton()
+        mainTabPanel.showBitcoinTabs()
+
+        // Wire up Bitcoin event handlers
+        bitcoinAddressesPanel.onGenerateNewAddress = { generateBitcoinAddress() }
+        bitcoinAddressesPanel.onAddressCopied = { address ->
+            Messages.showInfoMessage(project, "Address copied to clipboard", "Copied")
+        }
+        bitcoinActivityPanel.onRefreshClick = { loadBitcoinTransactions() }
+        bitcoinActivityPanel.onTransactionClick = { tx ->
+            val message = buildString {
+                append("Transaction ID: ${tx.txid}\n")
+                append("Category: ${tx.category}\n")
+                append("Address: ${tx.address}\n")
+                append("Amount: ${String.format("%.8f", tx.amount)} BTC\n")
+                append("Confirmations: ${tx.confirmations}\n")
+                tx.fee?.let { append("Fee: ${String.format("%.8f", it)} BTC\n") }
+                tx.blockhash?.let { append("Block: $it\n") }
+            }
+            Messages.showInfoMessage(project, message, "Transaction Details")
+        }
+
+        headerPanel.revalidate()
+        headerPanel.repaint()
+
+        // Auto-prompt RPC config if not yet configured
+        val network = networkManager.selectedNetwork.value
+        if (!networkManager.isBitcoinNetworkConfigured(network.id)) {
+            val configDialog = BitcoinRpcConfigDialog(project, networkManager, network)
+            if (configDialog.showAndGet()) {
+                // User configured successfully — invalidate cached client and load data
+                blockchainService.invalidateNetwork(network.id)
+                loadBitcoinAddresses()
+                loadBitcoinTransactions()
+                updateBalanceDisplay()
+                return
+            }
+        }
+
+        // Load Bitcoin data (either already configured, or user cancelled config)
+        loadBitcoinAddresses()
+        loadBitcoinTransactions()
+    }
+
+    private fun showStandardUI() {
+        if (!isBitcoinMode) return
+        isBitcoinMode = false
+
+        // Replace Bitcoin addresses panel with wallet selector
+        headerPanel.remove(bitcoinAddressesPanel)
+        headerPanel.add(walletSelectorBar)
+
+        // Restore Activity tab placeholder and show Tokens tab
+        mainTabPanel.restorePlaceholder()
+        mainTabPanel.showTokenAddButton()
+        mainTabPanel.showStandardTabs()
+
+        headerPanel.revalidate()
+        headerPanel.repaint()
+    }
+
+    private fun loadBitcoinAddresses() {
+        val network = networkManager.selectedNetwork.value
+        bitcoinAddressesPanel.showLoading()
+
+        scope.launch {
+            val result = blockchainService.getBitcoinAddresses(network)
+            SwingUtilities.invokeLater {
+                when (result) {
+                    is BitcoinAddressesResult.Success -> bitcoinAddressesPanel.updateAddresses(result.addresses)
+                    is BitcoinAddressesResult.Error -> bitcoinAddressesPanel.showError(result.message)
+                }
+            }
+        }
+    }
+
+    private fun loadBitcoinTransactions() {
+        val network = networkManager.selectedNetwork.value
+        bitcoinActivityPanel.showLoading()
+
+        scope.launch {
+            val result = blockchainService.getBitcoinTransactions(network)
+            SwingUtilities.invokeLater {
+                when (result) {
+                    is BitcoinTransactionsResult.Success -> bitcoinActivityPanel.updateTransactions(result.transactions)
+                    is BitcoinTransactionsResult.Error -> bitcoinActivityPanel.showError(result.message)
+                }
+            }
+        }
+    }
+
+    private fun generateBitcoinAddress() {
+        val network = networkManager.selectedNetwork.value
+
+        scope.launch {
+            val result = blockchainService.generateBitcoinAddress(network)
+            SwingUtilities.invokeLater {
+                when (result) {
+                    is dev.eastgate.metamaskclone.core.blockchain.BitcoinAddressResult.Success -> {
+                        Messages.showInfoMessage(project, "New address: ${result.address}", "Address Generated")
+                        loadBitcoinAddresses()
+                    }
+                    is dev.eastgate.metamaskclone.core.blockchain.BitcoinAddressResult.Error -> {
+                        Messages.showErrorDialog(project, "Failed: ${result.message}", "Error")
+                    }
+                }
+            }
+        }
+    }
+
     private fun showNetworkSelectionDialog() {
         val dialog = NetworkSelectionDialog(project, networkManager)
         dialog.show()
@@ -300,6 +442,17 @@ class MetaMaskToolWindow(private val project: Project) {
 
     private fun showWalletSelectionPopup() {
         val blockchainType = networkManager.getCurrentBlockchainType()
+
+        // Bitcoin wallets are managed by Bitcoin Core — show info instead
+        if (blockchainType == BlockchainType.BITCOIN) {
+            Messages.showInfoMessage(
+                project,
+                "Bitcoin wallets are managed by Bitcoin Core.\nUse bitcoin-cli to manage wallets and keys.",
+                "Bitcoin Core Wallet"
+            )
+            return
+        }
+
         val wallets = walletManager.getWalletsForBlockchainType(blockchainType)
 
         if (wallets.isEmpty()) {
@@ -326,6 +479,7 @@ class MetaMaskToolWindow(private val project: Project) {
         val createLabel = when (blockchainType) {
             BlockchainType.EVM -> "+ Create New Wallet"
             BlockchainType.TRON -> "+ Create New TRON Wallet"
+            BlockchainType.BITCOIN -> "" // unreachable
         }
         val createItem = JMenuItem(createLabel)
         createItem.addActionListener {
@@ -338,6 +492,7 @@ class MetaMaskToolWindow(private val project: Project) {
         val importLabel = when (blockchainType) {
             BlockchainType.EVM -> "+ Import Wallet"
             BlockchainType.TRON -> "+ Import TRON Wallet"
+            BlockchainType.BITCOIN -> "" // unreachable
         }
         val importItem = JMenuItem(importLabel)
         importItem.addActionListener {
@@ -368,9 +523,19 @@ class MetaMaskToolWindow(private val project: Project) {
     }
 
     private fun showCreateOrImportDialog(blockchainType: BlockchainType = BlockchainType.EVM) {
+        if (blockchainType == BlockchainType.BITCOIN) {
+            Messages.showInfoMessage(
+                project,
+                "Bitcoin wallets are managed by Bitcoin Core.\nConnect to a Bitcoin Core node to use Bitcoin functionality.",
+                "Bitcoin Core Wallet"
+            )
+            return
+        }
+
         val chainName = when (blockchainType) {
             BlockchainType.EVM -> "EVM"
             BlockchainType.TRON -> "TRON"
+            BlockchainType.BITCOIN -> return // unreachable
         }
 
         val options = arrayOf("Create New", "Import Existing", "Cancel")
@@ -423,6 +588,17 @@ class MetaMaskToolWindow(private val project: Project) {
     }
 
     private fun showReceiveDialog() {
+        // In Bitcoin mode, show QR for the first receiving address
+        if (isBitcoinMode) {
+            val firstAddress = bitcoinAddressesPanel.getFirstAddress()
+            if (firstAddress != null) {
+                bitcoinAddressesPanel.showAddressQRDialog(firstAddress)
+            } else {
+                Messages.showWarningDialog(project, "No Bitcoin addresses available. Generate one first.", "No Address")
+            }
+            return
+        }
+
         val wallet = walletManager.selectedWallet.value
         if (wallet == null) {
             Messages.showWarningDialog(project, "Please select a wallet first", "No Wallet Selected")

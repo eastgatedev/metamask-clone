@@ -152,4 +152,33 @@ class NetworkManager private constructor(private val project: Project) {
     fun generateCustomNetworkId(): String {
         return "CUSTOM_${System.currentTimeMillis()}"
     }
+
+    /**
+     * Get the effective RPC URL for a network.
+     * For Bitcoin networks, returns stored override if configured, otherwise the predefined placeholder.
+     * For other networks, returns network.rpcUrl directly.
+     */
+    fun getEffectiveRpcUrl(network: Network): String {
+        if (network.blockchainType == BlockchainType.BITCOIN) {
+            return storage.getBitcoinRpcUrl(network.id) ?: network.rpcUrl
+        }
+        return network.rpcUrl
+    }
+
+    /**
+     * Save a Bitcoin RPC URL override for a network.
+     */
+    fun setBitcoinRpcConfig(
+        networkId: String,
+        rpcUrl: String
+    ) {
+        storage.setBitcoinRpcUrl(networkId, rpcUrl)
+    }
+
+    /**
+     * Check if a Bitcoin network has been configured with user-provided RPC credentials.
+     */
+    fun isBitcoinNetworkConfigured(networkId: String): Boolean {
+        return storage.getBitcoinRpcUrl(networkId) != null
+    }
 }

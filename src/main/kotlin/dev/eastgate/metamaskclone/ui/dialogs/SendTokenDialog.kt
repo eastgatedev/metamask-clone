@@ -64,9 +64,11 @@ class SendTokenDialog(
     // TRC20 fee limit UI components
     private val feeLimitField = JBTextField("50")
     private lateinit var feeLimitLabel: JLabel
+    private lateinit var tokenSelectorLabel: JLabel
 
-    // Check if this is a TRON network
+    // Check blockchain type
     private val isTronNetwork = network.blockchainType == BlockchainType.TRON
+    private val isBitcoinNetwork = network.blockchainType == BlockchainType.BITCOIN
 
     init {
         title = "Send ${network.symbol}"
@@ -106,7 +108,29 @@ class SendTokenDialog(
      * TRON networks hide gas fields and show bandwidth info instead.
      */
     private fun setupForBlockchainType() {
-        if (isTronNetwork) {
+        if (isBitcoinNetwork) {
+            // Hide gas, token selector, and fee limit for Bitcoin
+            gasSettingsSeparator.isVisible = false
+            gasSettingsLabel.isVisible = false
+            gasLimitLabel.isVisible = false
+            gasLimitField.isVisible = false
+            gasPriceLabel.isVisible = false
+            gasPriceField.isVisible = false
+            tokenSelectorLabel.isVisible = false
+            tokenSelector.isVisible = false
+            feeLimitLabel.isVisible = false
+            feeLimitField.isVisible = false
+
+            // Update fee display for Bitcoin
+            estimatedFeeLabel.text = "Calculated by Bitcoin Core"
+            estimatedFeeLabel.foreground = java.awt.Color(0x059669)
+
+            // Mark gas as loaded since Bitcoin Core handles fees
+            gasPriceLoaded = true
+
+            // Fetch balance
+            fetchBalance()
+        } else if (isTronNetwork) {
             // Hide gas-related UI for TRON
             gasSettingsSeparator.isVisible = false
             gasSettingsLabel.isVisible = false
@@ -358,7 +382,12 @@ class SendTokenDialog(
 
         gbc.gridx = 1
         gbc.weightx = 1.0
-        val fromField = JBTextField("${wallet.name} (${wallet.getShortAddress()})")
+        val fromText = if (wallet.blockchainType == BlockchainType.BITCOIN) {
+            wallet.name
+        } else {
+            "${wallet.name} (${wallet.getShortAddress()})"
+        }
+        val fromField = JBTextField(fromText)
         fromField.isEditable = false
         fromField.toolTipText = wallet.address
         panel.add(fromField, gbc)
@@ -385,7 +414,11 @@ class SendTokenDialog(
         gbc.gridx = 1
         gbc.weightx = 1.0
         toAddressField.columns = 30
-        toAddressField.toolTipText = if (isTronNetwork) "Recipient TRON address (T...)" else "Recipient address (0x...)"
+        toAddressField.toolTipText = when {
+            isBitcoinNetwork -> "Recipient Bitcoin address"
+            isTronNetwork -> "Recipient TRON address (T...)"
+            else -> "Recipient address (0x...)"
+        }
         panel.add(toAddressField, gbc)
 
         // Token selector
@@ -393,7 +426,8 @@ class SendTokenDialog(
         gbc.gridx = 0
         gbc.gridy = row
         gbc.weightx = 0.0
-        panel.add(JLabel("Token:"), gbc)
+        tokenSelectorLabel = JLabel("Token:")
+        panel.add(tokenSelectorLabel, gbc)
 
         gbc.gridx = 1
         gbc.weightx = 1.0
@@ -519,7 +553,12 @@ class SendTokenDialog(
         }
 
         // Validate address format based on blockchain type
-        if (isTronNetwork) {
+        if (isBitcoinNetwork) {
+            if (toAddress.length < 26 || toAddress.length > 62) {
+                Messages.showErrorDialog("Invalid Bitcoin address format (expected 26-62 characters)", "Validation Error")
+                return
+            }
+        } else if (isTronNetwork) {
             if (!toAddress.startsWith("T") || toAddress.length != 34) {
                 Messages.showErrorDialog("Invalid TRON address format. Must be a 34-character address starting with T", "Validation Error")
                 return
@@ -549,8 +588,8 @@ class SendTokenDialog(
         val gasLimit: BigInteger
         val gasFeeWei: BigInteger
 
-        if (isTronNetwork) {
-            // TRON doesn't use gas - use zero values
+        if (isBitcoinNetwork || isTronNetwork) {
+            // Bitcoin and TRON don't use EVM gas - use zero values
             gasLimitValue = 0L
             gasPriceValue = BigDecimal.ZERO
             gasPriceWei = BigInteger.ZERO
@@ -599,7 +638,26 @@ class SendTokenDialog(
                 when (nativeBalanceResult) {
                     is BalanceResult.Success -> {
                         if (isNativeToken) {
-                            if (isTronNetwork) {
+                            if (isBitcoinNetwork) {
+                                // Bitcoin: compare in satoshis (1 BTC = 100,000,000 satoshis)
+                                val amountSatoshis = amountValue.multiply(BigDecimal(100_000_000L)).toBigInteger()
+
+                                if (nativeBalanceResult.balanceWei < amountSatoshis) {
+                                    Messages.showErrorDialog(
+                                        project,
+                                        """
+                                        Insufficient BTC balance.
+
+                                        Your balance: ${nativeBalanceResult.balanceFormatted} ${network.symbol}
+                                        Amount to send: $amountValue ${network.symbol}
+                                        """.trimIndent(),
+                                        "Insufficient Balance"
+                                    )
+                                    return@invokeLater
+                                }
+
+                                proceedWithBitcoinTransaction(toAddress, amountValue)
+                            } else if (isTronNetwork) {
                                 // TRON: Convert amount to SUN for comparison (1 TRX = 1,000,000 SUN)
                                 val amountSun = amountValue.multiply(BigDecimal(1_000_000L)).toBigInteger()
 
@@ -906,6 +964,72 @@ class SendTokenDialog(
                     }
                     is TransactionResult.Error -> {
                         Messages.showErrorDialog(project, "TRX transfer failed: ${result.message}", "Error")
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Handle Bitcoin transaction.
+     * Bitcoin Core signs the transaction server-side — no password needed.
+     */
+    private fun proceedWithBitcoinTransaction(
+        toAddress: String,
+        amountValue: BigDecimal
+    ) {
+        val confirmMessage = """
+            Send $amountValue ${network.symbol} to:
+            $toAddress
+
+            Fee: Calculated by Bitcoin Core
+
+            Continue?
+        """.trimIndent()
+
+        val confirmed = Messages.showYesNoDialog(
+            project,
+            confirmMessage,
+            "Confirm Bitcoin Transfer",
+            Messages.getQuestionIcon()
+        )
+
+        if (confirmed != Messages.YES) {
+            return
+        }
+
+        // Disable dialog while sending
+        isOKActionEnabled = false
+        rootPane?.cursor = Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR)
+
+        scope.launch {
+            val result = blockchainService.sendBitcoin(
+                toAddress = toAddress,
+                amount = amountValue.toDouble(),
+                network = network
+            )
+
+            SwingUtilities.invokeLater {
+                rootPane?.cursor = Cursor.getDefaultCursor()
+                isOKActionEnabled = true
+
+                when (result) {
+                    is TransactionResult.Success -> {
+                        val message = buildString {
+                            append("Bitcoin transfer sent successfully!\n\n")
+                            append("Transaction ID:\n${result.transactionHash}\n\n")
+                            result.explorerUrl?.let {
+                                append("View on Explorer:\n$it")
+                            }
+                        }
+                        Messages.showInfoMessage(project, message, "Bitcoin Transfer Sent")
+
+                        ClipboardUtil.copyToClipboard(result.transactionHash)
+
+                        super.doOKAction()
+                    }
+                    is TransactionResult.Error -> {
+                        Messages.showErrorDialog(project, "Bitcoin transfer failed: ${result.message}", "Error")
                     }
                 }
             }

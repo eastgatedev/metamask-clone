@@ -43,11 +43,31 @@ All behaviors are either simulated or simplified for clarity.
 - **Target IntelliJ:** 2025.1
 - **Build Tool:** Gradle
 
-## Video Tutorial
+## JetBrains Marketplace
+
+Install the plugin directly from the JetBrains Marketplace:
+
+[MetaMask Clone Showcase on JetBrains Marketplace](https://plugins.jetbrains.com/plugin/29585-metamask-clone-showcase-)
+
+## Video Tutorial & Episode Guides
 
 Learn how to build this plugin step-by-step with our comprehensive video tutorial series:
 
-[Watch the Tutorial Series](https://youtube.com/playlist?list=PLbqZIOzRvr8mrKmli_WOVogsUTawr9dML&si=6c4ZE7E6WmiuzqaR)
+[Watch the Full Playlist on YouTube](https://youtube.com/playlist?list=PLbqZIOzRvr8mrKmli_WOVogsUTawr9dML&si=6c4ZE7E6WmiuzqaR)
+
+### Episode List
+
+| Episode | Title | Video | Guide |
+|---------|-------|-------|-------|
+| EP01 | IntelliJ Plugin开发环境搭建 / Plugin Development Setup | [🎬 Watch](https://youtu.be/OmCBY8EkklE) | [📖 Guide](docs/episodes/ep01-intellij_plugin_setup.md) |
+| EP02 | 多Agent协作 & UI重新设计 / Multi-Agent Collaboration & UI Redesign | [🎬 Watch](https://youtu.be/XGGEhTAuiWQ) | [📖 Guide](docs/episodes/ep02-bsc_testnet_guide.md) |
+| EP03 | 从后端工程师视角理解EVM Transaction / EVM Transactions from Backend Perspective | [🎬 Watch](https://youtu.be/SGxM09HeiPk) | [📖 Guide](docs/episodes/ep03-evm_transaction_guide.md) |
+| EP04 | 从Native Coin到ERC20 Token / From Native Coin to ERC20 | [🎬 Watch](https://youtu.be/b3cxsHu1Dm4) | [📖 Guide](docs/episodes/ep04-erc20_token_guide.md) |
+| EP05 | 发布到IntelliJ Plugin Marketplace / Publish to Marketplace | [🎬 Watch](https://youtu.be/KZtfq0mpnuw) | [📖 Guide](docs/episodes/ep05-plugin_marketplace.md) |
+| EP06 | TRON钱包系统 / TRON Wallet System | [🎬 Watch](https://youtu.be/7KM0kCrmv28) | [📖 Guide](docs/episodes/ep06-tron_wallet_guide.md) |
+| EP07 | TRON Runtime：TRX转账 / TRON Runtime: TRX Transfer | [🎬 Watch](https://youtu.be/vSEKXA5KOVg) | [📖 Guide](docs/episodes/ep07-trx_transfer_guide.md) |
+| EP08 | TRC20 钱包运行期 / TRC20 Wallet Runtime: Contract-Based Payment Execution | [🎬 Watch](https://youtu.be/amakBnKsmQ8) | [📖 Guide](docs/episodes/ep08-trc20_runtime_guide.md) |
+| EP09 | Bitcoin钱包系统 / Bitcoin Wallet System | [🎬 Watch](https://youtu.be/ulAXb_hQmjQ) | [📖 Guide](docs/episodes/ep09-bitcoin_wallet_guide.md) |
 
 ## Getting Started
 

@@ -55,6 +55,7 @@
         <ul>
             <li><strong>EVM Networks:</strong> Ethereum, BNB Smart Chain, Polygon (ERC20 tokens)</li>
             <li><strong>TRON Network:</strong> TRON Mainnet, Shasta Testnet (TRC20 tokens)</li>
+            <li><strong>Bitcoin Network:</strong> Bitcoin Mainnet, Testnet, Regtest (via Bitcoin Core RPC)</li>
         </ul>
 
         <h2>Key Characteristics</h2>
@@ -150,6 +151,14 @@
                 <td>EP07</td>
                 <td><a href="https://youtu.be/vSEKXA5KOVg">TRON 钱包运行期: 从 Balance 到 Transfer | TRON Wallet Runtime: From Balance to Transfer</a></td>
             </tr>
+            <tr>
+                <td>EP08</td>
+                <td><a href="https://youtu.be/amakBnKsmQ8">TRC20 钱包运行期：合约支付的执行行为 | TRC20 Wallet Runtime: Contract-Based Payment Execution</a></td>
+            </tr>
+            <tr>
+                <td>EP09</td>
+                <td><a href="https://youtu.be/ulAXb_hQmjQ">Bitcoin钱包系统 | Bitcoin Wallet System</a></td>
+            </tr>
         </table>
 
         <hr/>
@@ -169,6 +178,18 @@
 
     <change-notes>
     <![CDATA[
+    <h2>Version 1.4</h2>
+    <ul>
+      <li><strong>Bitcoin Wallet Support:</strong> Connect to Bitcoin Core RPC for wallet management</li>
+      <li>Bitcoin Mainnet, Testnet, and Regtest network support</li>
+      <li>View wallet balance, receiving addresses, and transaction history</li>
+      <li>Send BTC and generate new receiving addresses</li>
+      <li>QR code display for Bitcoin receiving addresses</li>
+      <li>Bitcoin RPC credential configuration dialog with Test Connection</li>
+      <li>Auto-prompt RPC config when selecting an unconfigured Bitcoin network</li>
+      <li>Dedicated Bitcoin UI mode (addresses panel, activity tab)</li>
+    </ul>
+
     <h2>Version 1.3</h2>
 
     <ul>

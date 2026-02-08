@@ -27,6 +27,7 @@ data class Wallet(
         return when (blockchainType) {
             BlockchainType.EVM -> address.startsWith("0x") && address.length == 42
             BlockchainType.TRON -> address.startsWith("T") && address.length == 34
+            BlockchainType.BITCOIN -> address.length in 26..62
         }
     }
 }
