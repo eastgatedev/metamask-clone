@@ -4,6 +4,7 @@ import com.intellij.openapi.project.Project
 import dev.eastgate.metamaskclone.core.network.NetworkManager
 import dev.eastgate.metamaskclone.core.storage.Network
 import dev.eastgate.metamaskclone.models.BlockchainType
+import dev.eastgate.metamaskclone.models.Token
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -34,6 +35,8 @@ class BlockchainService private constructor(private val project: Project) {
     private val web3jInstances = ConcurrentHashMap<String, Web3j>()
     private val tronClients = ConcurrentHashMap<String, TronGrpcClient>()
     private val bitcoinClients = ConcurrentHashMap<String, BitcoinRpcClient>()
+    private val evmScanClients = ConcurrentHashMap<String, EvmScanClient>()
+    private val tronGridClients = ConcurrentHashMap<String, TronGridClient>()
 
     companion object {
         private val instances = ConcurrentHashMap<Project, BlockchainService>()
@@ -46,6 +49,7 @@ class BlockchainService private constructor(private val project: Project) {
         const val ERC20_GAS_LIMIT = 100000L
         const val DEFAULT_TIMEOUT_SECONDS = 60
         const val DEFAULT_POLL_INTERVAL_MS = 2000L
+        const val ETHERSCAN_API_KEY = "PNQJ9UZ4PECH7Q31TGDD21DQB3QYK6A5SR"
     }
 
     /**
@@ -776,6 +780,104 @@ class BlockchainService private constructor(private val project: Project) {
             }
         }
 
+    // ==================== Transaction History Methods ====================
+
+    /**
+     * Fetch EVM transaction history (native + ERC20) for a wallet.
+     *
+     * @param network The EVM network
+     * @param walletAddress The wallet address to query
+     * @param tokens List of tokens to fetch ERC20 transactions for
+     */
+    suspend fun getEvmTransactions(
+        network: Network,
+        walletAddress: String,
+        tokens: List<Token>
+    ): EvmTransactionsResult =
+        withContext(Dispatchers.IO) {
+            try {
+                // Etherscan V2 free API key only supports Ethereum Mainnet and Sepolia
+                val supportedChainIds = setOf(1L, 11155111L)
+                val chainId = network.chainId.toLong()
+                if (chainId !in supportedChainIds) {
+                    return@withContext EvmTransactionsResult.Error(
+                        "Transaction history is not available for ${network.name}. " +
+                            "Etherscan API only supports Ethereum Mainnet and Sepolia."
+                    )
+                }
+
+                val client = evmScanClients.computeIfAbsent("etherscan") {
+                    EvmScanClient(ETHERSCAN_API_KEY)
+                }
+
+                val allTransactions = mutableListOf<EvmTransaction>()
+
+                // Fetch native transactions
+                val nativeTxs = client.getNativeTransactions(
+                    chainId = chainId,
+                    walletAddress = walletAddress,
+                    offset = 20
+                )
+                allTransactions.addAll(nativeTxs)
+
+                // Fetch ERC20 transactions for each token
+                val networkTokens = tokens.filter { it.networkId == network.id }
+                for (token in networkTokens) {
+                    val erc20Txs = client.getErc20Transactions(
+                        chainId = chainId,
+                        walletAddress = walletAddress,
+                        tokenAddress = token.contractAddress,
+                        offset = 20
+                    )
+                    allTransactions.addAll(erc20Txs)
+                }
+
+                // Sort by timestamp descending
+                val sorted = allTransactions.sortedByDescending { it.timeStamp }
+                EvmTransactionsResult.Success(sorted)
+            } catch (e: Exception) {
+                EvmTransactionsResult.Error(e.message ?: "Failed to fetch EVM transactions")
+            }
+        }
+
+    /**
+     * Fetch TRON transaction history (TRX + TRC20) for a wallet.
+     *
+     * @param network The TRON network
+     * @param walletAddress The wallet address to query
+     */
+    suspend fun getTronTransactions(
+        network: Network,
+        walletAddress: String
+    ): TronTransactionsResult =
+        withContext(Dispatchers.IO) {
+            try {
+                val client = tronGridClients.computeIfAbsent(network.id) {
+                    when (network.id) {
+                        "TRON_MAINNET" -> TronGridClient.ofMainnet()
+                        "TRON_SHASTA" -> TronGridClient.ofShasta()
+                        else -> throw IllegalStateException("Unknown TRON network: ${network.id}")
+                    }
+                }
+
+                val allTransactions = mutableListOf<TronTransaction>()
+
+                // Fetch TRX transactions
+                val trxTxs = client.getTrxTransactions(walletAddress)
+                allTransactions.addAll(trxTxs)
+
+                // Fetch TRC20 transactions
+                val trc20Txs = client.getTrc20Transactions(walletAddress)
+                allTransactions.addAll(trc20Txs)
+
+                // Sort by blockTimestamp descending
+                val sorted = allTransactions.sortedByDescending { it.blockTimestamp }
+                TronTransactionsResult.Success(sorted)
+            } catch (e: Exception) {
+                TronTransactionsResult.Error(e.message ?: "Failed to fetch TRON transactions")
+            }
+        }
+
     /**
      * Invalidate cached client instance for a network.
      * Useful when network RPC URL changes.
@@ -785,6 +887,8 @@ class BlockchainService private constructor(private val project: Project) {
         web3jInstances.remove(networkId)?.shutdown()
         tronClients.remove(networkId)?.close()
         bitcoinClients.remove(networkId)?.close()
+        evmScanClients.remove(networkId)?.close()
+        tronGridClients.remove(networkId)?.close()
     }
 
     /**
@@ -797,6 +901,10 @@ class BlockchainService private constructor(private val project: Project) {
         tronClients.clear()
         bitcoinClients.values.forEach { it.close() }
         bitcoinClients.clear()
+        evmScanClients.values.forEach { it.close() }
+        evmScanClients.clear()
+        tronGridClients.values.forEach { it.close() }
+        tronGridClients.clear()
     }
 }
 
@@ -887,4 +995,16 @@ sealed class BitcoinAddressResult {
 sealed class BitcoinTransactionsResult {
     data class Success(val transactions: List<BitcoinTransaction>) : BitcoinTransactionsResult()
     data class Error(val message: String) : BitcoinTransactionsResult()
+}
+
+// EVM/TRON Transaction History Result Classes
+
+sealed class EvmTransactionsResult {
+    data class Success(val transactions: List<EvmTransaction>) : EvmTransactionsResult()
+    data class Error(val message: String) : EvmTransactionsResult()
+}
+
+sealed class TronTransactionsResult {
+    data class Success(val transactions: List<TronTransaction>) : TronTransactionsResult()
+    data class Error(val message: String) : TronTransactionsResult()
 }

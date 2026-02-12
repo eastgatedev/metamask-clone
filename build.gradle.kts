@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "dev.eastgate.metamaskclone"
-version = "1.4"
+version = "1.5"
 
 configure<org.jlleitschuh.gradle.ktlint.KtlintExtension> {
     version.set("1.4.1")
@@ -80,6 +80,7 @@ dependencies {
     testImplementation("junit:junit:4.13.2") // Required for IntelliJ Platform test framework
     testRuntimeOnly("org.junit.vintage:junit-vintage-engine:5.10.2") // JUnit 4 compatibility
     testImplementation("org.mockito.kotlin:mockito-kotlin:5.2.1")
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
 }
 
 intellijPlatform {

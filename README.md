@@ -57,17 +57,18 @@ Learn how to build this plugin step-by-step with our comprehensive video tutoria
 
 ### Episode List
 
-| Episode | Title | Video | Guide |
-|---------|-------|-------|-------|
-| EP01 | IntelliJ Plugin开发环境搭建 / Plugin Development Setup | [🎬 Watch](https://youtu.be/OmCBY8EkklE) | [📖 Guide](docs/episodes/ep01-intellij_plugin_setup.md) |
-| EP02 | 多Agent协作 & UI重新设计 / Multi-Agent Collaboration & UI Redesign | [🎬 Watch](https://youtu.be/XGGEhTAuiWQ) | [📖 Guide](docs/episodes/ep02-bsc_testnet_guide.md) |
-| EP03 | 从后端工程师视角理解EVM Transaction / EVM Transactions from Backend Perspective | [🎬 Watch](https://youtu.be/SGxM09HeiPk) | [📖 Guide](docs/episodes/ep03-evm_transaction_guide.md) |
-| EP04 | 从Native Coin到ERC20 Token / From Native Coin to ERC20 | [🎬 Watch](https://youtu.be/b3cxsHu1Dm4) | [📖 Guide](docs/episodes/ep04-erc20_token_guide.md) |
-| EP05 | 发布到IntelliJ Plugin Marketplace / Publish to Marketplace | [🎬 Watch](https://youtu.be/KZtfq0mpnuw) | [📖 Guide](docs/episodes/ep05-plugin_marketplace.md) |
-| EP06 | TRON钱包系统 / TRON Wallet System | [🎬 Watch](https://youtu.be/7KM0kCrmv28) | [📖 Guide](docs/episodes/ep06-tron_wallet_guide.md) |
-| EP07 | TRON Runtime：TRX转账 / TRON Runtime: TRX Transfer | [🎬 Watch](https://youtu.be/vSEKXA5KOVg) | [📖 Guide](docs/episodes/ep07-trx_transfer_guide.md) |
-| EP08 | TRC20 钱包运行期 / TRC20 Wallet Runtime: Contract-Based Payment Execution | [🎬 Watch](https://youtu.be/amakBnKsmQ8) | [📖 Guide](docs/episodes/ep08-trc20_runtime_guide.md) |
-| EP09 | Bitcoin钱包系统 / Bitcoin Wallet System | [🎬 Watch](https://youtu.be/ulAXb_hQmjQ) | [📖 Guide](docs/episodes/ep09-bitcoin_wallet_guide.md) |
+| Episode | Title                                                                       | Video | Guide |
+|---------|-----------------------------------------------------------------------------|-------|-------|
+| EP01 | IntelliJ Plugin开发环境搭建 / Plugin Development Setup                            | [🎬 Watch](https://youtu.be/OmCBY8EkklE) | [📖 Guide](docs/episodes/ep01-intellij_plugin_setup.md) |
+| EP02 | 多Agent协作 & UI重新设计 / Multi-Agent Collaboration & UI Redesign                 | [🎬 Watch](https://youtu.be/XGGEhTAuiWQ) | [📖 Guide](docs/episodes/ep02-bsc_testnet_guide.md) |
+| EP03 | 从后端工程师视角理解EVM Transaction / EVM Transactions from Backend Perspective       | [🎬 Watch](https://youtu.be/SGxM09HeiPk) | [📖 Guide](docs/episodes/ep03-evm_transaction_guide.md) |
+| EP04 | 从Native Coin到ERC20 Token / From Native Coin to ERC20                        | [🎬 Watch](https://youtu.be/b3cxsHu1Dm4) | [📖 Guide](docs/episodes/ep04-erc20_token_guide.md) |
+| EP05 | 发布到IntelliJ Plugin Marketplace / Publish to Marketplace                     | [🎬 Watch](https://youtu.be/KZtfq0mpnuw) | [📖 Guide](docs/episodes/ep05-plugin_marketplace.md) |
+| EP06 | TRON钱包系统 / TRON Wallet System                                               | [🎬 Watch](https://youtu.be/7KM0kCrmv28) | [📖 Guide](docs/episodes/ep06-tron_wallet_guide.md) |
+| EP07 | TRON Runtime：TRX转账 / TRON Runtime: TRX Transfer                             | [🎬 Watch](https://youtu.be/vSEKXA5KOVg) | [📖 Guide](docs/episodes/ep07-trx_transfer_guide.md) |
+| EP08 | TRC20 钱包运行期 / TRC20 Wallet Runtime: Contract-Based Payment Execution        | [🎬 Watch](https://youtu.be/amakBnKsmQ8) | [📖 Guide](docs/episodes/ep08-trc20_runtime_guide.md) |
+| EP09 | Bitcoin 钱包系统：从 Account 到 UTXO / Bitcoin Wallet System: From Account to UTXO | [🎬 Watch](https://youtu.be/ulAXb_hQmjQ) | [📖 Guide](docs/episodes/ep09-bitcoin_wallet_guide.md) |
+| EP10 | Explorer & Indexing：钱包交易历史 / Explorer & Indexing: Wallet Transaction History | [🎬 Watch](https://youtu.be/aHIcRoVG9SU) | [📖 Guide](docs/episodes/ep10-explorer_indexing.md) |
 
 ## Getting Started
 

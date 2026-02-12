@@ -174,6 +174,22 @@ class MainTabPanel : JPanel() {
     }
 
     /**
+     * Replace Activity tab content with an EVM/TRON activity panel.
+     */
+    fun replaceActivityPanel(panel: JPanel) {
+        // Remove existing activity panel from card layout
+        val componentsToRemove = contentPanel.components.filter { it !== tokenListPanel }
+        componentsToRemove.forEach { contentPanel.remove(it) }
+        contentPanel.add(panel, "Activity")
+        if (selectedTab == "Activity") {
+            val cardLayout = contentPanel.layout as CardLayout
+            cardLayout.show(contentPanel, "Activity")
+        }
+        contentPanel.revalidate()
+        contentPanel.repaint()
+    }
+
+    /**
      * Restore original Activity tab placeholder.
      */
     fun restorePlaceholder() {

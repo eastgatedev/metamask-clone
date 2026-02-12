@@ -9,7 +9,9 @@ import dev.eastgate.metamaskclone.core.blockchain.BalanceResult
 import dev.eastgate.metamaskclone.core.blockchain.BitcoinAddressesResult
 import dev.eastgate.metamaskclone.core.blockchain.BitcoinTransactionsResult
 import dev.eastgate.metamaskclone.core.blockchain.BlockchainService
+import dev.eastgate.metamaskclone.core.blockchain.EvmTransactionsResult
 import dev.eastgate.metamaskclone.core.blockchain.TokenBalanceResult
+import dev.eastgate.metamaskclone.core.blockchain.TronTransactionsResult
 import dev.eastgate.metamaskclone.core.network.NetworkManager
 import dev.eastgate.metamaskclone.core.storage.ProjectStorage
 import dev.eastgate.metamaskclone.core.wallet.WalletManager
@@ -18,6 +20,7 @@ import dev.eastgate.metamaskclone.models.Token
 import dev.eastgate.metamaskclone.models.Wallet
 import dev.eastgate.metamaskclone.ui.dialogs.*
 import dev.eastgate.metamaskclone.ui.panels.*
+import dev.eastgate.metamaskclone.ui.panels.toActivityItem
 import kotlinx.coroutines.*
 import java.awt.BorderLayout
 import java.awt.Font
@@ -42,6 +45,9 @@ class MetaMaskToolWindow(private val project: Project) {
     // Bitcoin UI components
     private val bitcoinAddressesPanel = BitcoinAddressesPanel()
     private val bitcoinActivityPanel = BitcoinActivityPanel()
+
+    // EVM/TRON Activity panel
+    private val activityPanel = ActivityPanel()
 
     // State
     private var tokens: MutableList<Token> = mutableListOf()
@@ -100,6 +106,15 @@ class MetaMaskToolWindow(private val project: Project) {
         updateNetworkUI()
         updateWalletUI()
         updateTokensUI()
+
+        // Wire up activity panel for EVM/TRON on startup
+        val initialNetwork = networkManager.selectedNetwork.value
+        if (initialNetwork.blockchainType != BlockchainType.BITCOIN) {
+            mainTabPanel.replaceActivityPanel(activityPanel)
+            activityPanel.onRefreshClick = { loadActivityTransactions() }
+            activityPanel.onTransactionClick = { item -> showTransactionDetails(item) }
+            loadActivityTransactions()
+        }
     }
 
     private fun observeChanges() {
@@ -123,6 +138,10 @@ class MetaMaskToolWindow(private val project: Project) {
                 }
                 // Refresh token balances when network changes
                 refreshTokenBalances()
+                // Refresh activity for EVM/TRON
+                if (network.blockchainType != BlockchainType.BITCOIN) {
+                    SwingUtilities.invokeLater { loadActivityTransactions() }
+                }
             }
         }
 
@@ -151,9 +170,13 @@ class MetaMaskToolWindow(private val project: Project) {
                     walletSelectorBar.updateWallet(wallet)
                     updateBalanceDisplay()
                 }
-                // Refresh token balances when wallet changes
+                // Refresh token balances and activity when wallet changes
                 if (wallet != null) {
                     refreshTokenBalances()
+                    val network = networkManager.selectedNetwork.value
+                    if (network.blockchainType != BlockchainType.BITCOIN) {
+                        SwingUtilities.invokeLater { loadActivityTransactions() }
+                    }
                 }
             }
         }
@@ -377,13 +400,20 @@ class MetaMaskToolWindow(private val project: Project) {
         headerPanel.remove(bitcoinAddressesPanel)
         headerPanel.add(walletSelectorBar)
 
-        // Restore Activity tab placeholder and show Tokens tab
-        mainTabPanel.restorePlaceholder()
+        // Replace Activity tab with EVM/TRON activity panel and show Tokens tab
+        mainTabPanel.replaceActivityPanel(activityPanel)
         mainTabPanel.showTokenAddButton()
         mainTabPanel.showStandardTabs()
 
+        // Wire up event handlers
+        activityPanel.onRefreshClick = { loadActivityTransactions() }
+        activityPanel.onTransactionClick = { item -> showTransactionDetails(item) }
+
         headerPanel.revalidate()
         headerPanel.repaint()
+
+        // Load transactions for the current network/wallet
+        loadActivityTransactions()
     }
 
     private fun loadBitcoinAddresses() {
@@ -414,6 +444,59 @@ class MetaMaskToolWindow(private val project: Project) {
                 }
             }
         }
+    }
+
+    // ==================== EVM/TRON Activity ====================
+
+    private fun loadActivityTransactions() {
+        val wallet = walletManager.selectedWallet.value ?: return
+        val network = networkManager.selectedNetwork.value
+
+        if (network.blockchainType == BlockchainType.BITCOIN) return
+
+        activityPanel.showLoading()
+
+        scope.launch {
+            when (network.blockchainType) {
+                BlockchainType.EVM -> {
+                    val networkTokens = tokens.filter { it.networkId == network.id }
+                    val result = blockchainService.getEvmTransactions(network, wallet.address, networkTokens)
+                    SwingUtilities.invokeLater {
+                        when (result) {
+                            is EvmTransactionsResult.Success -> {
+                                val items = result.transactions.map { it.toActivityItem(wallet.address, network) }
+                                activityPanel.updateTransactions(items)
+                            }
+                            is EvmTransactionsResult.Error -> activityPanel.showError(result.message)
+                        }
+                    }
+                }
+                BlockchainType.TRON -> {
+                    val result = blockchainService.getTronTransactions(network, wallet.address)
+                    SwingUtilities.invokeLater {
+                        when (result) {
+                            is TronTransactionsResult.Success -> {
+                                val items = result.transactions.map { it.toActivityItem(wallet.address, network) }
+                                activityPanel.updateTransactions(items)
+                            }
+                            is TronTransactionsResult.Error -> activityPanel.showError(result.message)
+                        }
+                    }
+                }
+                BlockchainType.BITCOIN -> { /* handled by BitcoinActivityPanel */ }
+            }
+        }
+    }
+
+    private fun showTransactionDetails(item: ActivityItem) {
+        val message = buildString {
+            append("Transaction: ${item.txHash}\n")
+            append("Direction: ${item.direction}\n")
+            append("Address: ${item.counterpartyAddress}\n")
+            append("Amount: ${if (item.isSend) "-" else "+"}${item.amount} ${item.symbol}\n")
+            item.explorerUrl?.let { append("\nExplorer: $it\n") }
+        }
+        Messages.showInfoMessage(project, message, "Transaction Details")
     }
 
     private fun generateBitcoinAddress() {

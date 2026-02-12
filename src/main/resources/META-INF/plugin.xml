@@ -53,8 +53,8 @@
 
         <h2>Supported Networks</h2>
         <ul>
-            <li><strong>EVM Networks:</strong> Ethereum, BNB Smart Chain, Polygon (ERC20 tokens)</li>
-            <li><strong>TRON Network:</strong> TRON Mainnet, Shasta Testnet (TRC20 tokens)</li>
+            <li><strong>EVM Networks:</strong> Ethereum, BNB Smart Chain, Polygon (ERC20 tokens, transaction history via Etherscan)</li>
+            <li><strong>TRON Network:</strong> TRON Mainnet, Shasta Testnet (TRC20 tokens, transaction history via TronGrid)</li>
             <li><strong>Bitcoin Network:</strong> Bitcoin Mainnet, Testnet, Regtest (via Bitcoin Core RPC)</li>
         </ul>
 
@@ -157,7 +157,11 @@
             </tr>
             <tr>
                 <td>EP09</td>
-                <td><a href="https://youtu.be/ulAXb_hQmjQ">Bitcoin钱包系统 | Bitcoin Wallet System</a></td>
+                <td><a href="https://youtu.be/ulAXb_hQmjQ">Bitcoin 钱包系统：从 Account 到 UTXO | Bitcoin Wallet System: From Account to UTXO</a></td>
+            </tr>
+            <tr>
+                <td>EP10</td>
+                <td><a href="https://youtu.be/aHIcRoVG9SU">Explorer &amp; Indexing：钱包交易历史 | Explorer &amp; Indexing: Wallet Transaction History</a></td>
             </tr>
         </table>
 
@@ -178,6 +182,17 @@
 
     <change-notes>
     <![CDATA[
+    <h2>Version 1.5</h2>
+    <ul>
+      <li><strong>Transaction History (EVM):</strong> View native coin and ERC20 token transaction history via Etherscan V2 API</li>
+      <li><strong>Transaction History (TRON):</strong> View TRX and TRC20 token transaction history via TronGrid API</li>
+      <li>Activity tab now displays combined transaction list sorted by date (newest first)</li>
+      <li>Each transaction row shows direction (Sent/Received), counterparty address, amount, and date</li>
+      <li>Click transaction rows to open in block explorer (Etherscan / TronScan)</li>
+      <li>Activity auto-refreshes on network and wallet changes</li>
+      <li>Graceful error handling for unsupported EVM chains (Etherscan free key supports Ethereum Mainnet and Sepolia only)</li>
+    </ul>
+
     <h2>Version 1.4</h2>
     <ul>
       <li><strong>Bitcoin Wallet Support:</strong> Connect to Bitcoin Core RPC for wallet management</li>
