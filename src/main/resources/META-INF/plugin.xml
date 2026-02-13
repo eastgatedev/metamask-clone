@@ -163,6 +163,10 @@
                 <td>EP10</td>
                 <td><a href="https://youtu.be/aHIcRoVG9SU">Explorer &amp; Indexing：钱包交易历史 | Explorer &amp; Indexing: Wallet Transaction History</a></td>
             </tr>
+            <tr>
+                <td>EP11</td>
+                <td><a href="https://youtu.be/oB1TnuzX1a8">从实现到责任 | From Implementation to Responsibility</a></td>
+            </tr>
         </table>
 
         <hr/>
@@ -182,6 +186,14 @@
 
     <change-notes>
     <![CDATA[
+    <h2>Version 1.6</h2>
+    <ul>
+      <li><strong>Series Finale (EP11):</strong> From Implementation to Responsibility — final episode focusing on system boundaries and responsibility levels</li>
+      <li>Complete 11-episode tutorial series covering EVM, TRON, and Bitcoin wallet architecture</li>
+      <li>Added EP11 episode guide documenting the distinction between implementation-level and responsibility-level systems</li>
+      <li>No new features — this release marks the educational series completion</li>
+    </ul>
+
     <h2>Version 1.5</h2>
     <ul>
       <li><strong>Transaction History (EVM):</strong> View native coin and ERC20 token transaction history via Etherscan V2 API</li>

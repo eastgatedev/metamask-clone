@@ -69,6 +69,7 @@ Learn how to build this plugin step-by-step with our comprehensive video tutoria
 | EP08 | TRC20 钱包运行期 / TRC20 Wallet Runtime: Contract-Based Payment Execution        | [🎬 Watch](https://youtu.be/amakBnKsmQ8) | [📖 Guide](docs/episodes/ep08-trc20_runtime_guide.md) |
 | EP09 | Bitcoin 钱包系统：从 Account 到 UTXO / Bitcoin Wallet System: From Account to UTXO | [🎬 Watch](https://youtu.be/ulAXb_hQmjQ) | [📖 Guide](docs/episodes/ep09-bitcoin_wallet_guide.md) |
 | EP10 | Explorer & Indexing：钱包交易历史 / Explorer & Indexing: Wallet Transaction History | [🎬 Watch](https://youtu.be/aHIcRoVG9SU) | [📖 Guide](docs/episodes/ep10-explorer_indexing.md) |
+| EP11 | 从实现到责任 / From Implementation to Responsibility                                  | [🎬 Watch](https://youtu.be/oB1TnuzX1a8) | [📖 Guide](docs/episodes/ep11-final_episode.md) |
 
 ## Getting Started
 
